@@ -10,6 +10,10 @@ Portman does not parse the traffic. It is a byte pipe, so the backend must accep
 
 Experimental (v0.1.0). The TLS tunnel and logging work, but the project has not yet been tested with a full production workload.
 
+## Versioning
+
+Releases use [Semantic Versioning](https://semver.org/) and are tagged `vX.Y.Z`. Until 1.0.0, a minor version may change configuration or behavior. See [CHANGELOG.md](CHANGELOG.md) for what changed in each release.
+
 ## Requirements
 
 - Go 1.21 or newer

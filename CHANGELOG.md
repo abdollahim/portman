@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Unit tests for config loading and validation, and for logging levels.
+- Integration test for the server: TLS handshake, forwarding to a backend, and an echo round trip.
+- `release.ps1` runs `go test` before building.
+- Versioning section in the README.
+
 ## [0.1.0] - 2026-11-20
 
 ### Added
