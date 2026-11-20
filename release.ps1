@@ -41,12 +41,15 @@ $targets = @(
     @{ GOOS = "linux";   GOARCH = "amd64"; Ext = "" }
 )
 
-# Checks before building.
+# Checks before building: vet, formatting, then tests.
 go vet ./...
 if ($LASTEXITCODE -ne 0) { throw "go vet failed" }
 
 $unformatted = gofmt -l .
 if ($unformatted) { throw "gofmt needed on:`n$unformatted" }
+
+go test -count=1 ./...
+if ($LASTEXITCODE -ne 0) { throw "go test failed" }
 
 New-Item -ItemType Directory -Force -Path "dist" | Out-Null
 
