@@ -1,0 +1,8 @@
+{
+  "mode": "client",
+  "listen_addr": "127.0.0.1:20001",
+  "remote_addr": "bridge.example.com:4443",
+  "server_name": "bridge.example.com",
+  "log_level": "info",
+  "log_path": "/var/log/portman/portman.log"
+}

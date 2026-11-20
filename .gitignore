@@ -1,0 +1,21 @@
+# build output
+/dist/
+/bin/
+/portman
+
+# not published: local notes, docs, plain-text files
+/docs/
+*.txt
+
+# real configs: only example configs are tracked
+*.json
+!configs/*.example.json
+
+# logs and captures
+*.log
+*.pcap
+
+# editor and OS files
+.vscode/
+.idea/
+.DS_Store

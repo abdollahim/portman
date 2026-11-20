@@ -1,0 +1,9 @@
+{
+  "mode": "server",
+  "listen_addr": ":4443",
+  "backend_addr": "127.0.0.1:10000",
+  "cert_file": "/etc/letsencrypt/live/bridge.example.com/fullchain.pem",
+  "key_file": "/etc/letsencrypt/live/bridge.example.com/privkey.pem",
+  "log_level": "info",
+  "log_path": "/var/log/portman/portman.log"
+}
