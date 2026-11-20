@@ -1,0 +1,20 @@
+[Unit]
+Description=Portman TLS Bridge Client
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=portman
+Group=portman
+ExecStart=/usr/local/bin/portman -config /etc/portman/client.json
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/log/portman
+
+[Install]
+WantedBy=multi-user.target
