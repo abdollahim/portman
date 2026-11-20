@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-20
+
+### Added
+- (keep the items you listed under Unreleased → Added)
+- `-version` flag prints the version, commit, and build time.
+
+### Changed
+- (keep the items you listed under Unreleased → Changed)
+
+### Notes
+- Tested end to end with one inside/foreign pair. Still experimental.
+
 ### Added
 - Unit tests for config loading and validation, and for logging levels.
 - Integration test for the server: TLS handshake, forwarding to a backend, and an echo round trip.
