@@ -20,3 +20,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Config validation with clear error messages.
 - Half-close handling and a drain timeout, so one finished direction does not hang the other.
 - Minimum TLS 1.2 on both sides.
+
+### Changed
+- Client retries the TLS connection up to 3 times, waiting 1s and then 2s, before it drops a local connection.

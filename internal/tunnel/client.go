@@ -36,7 +36,7 @@ func handleClientConn(local net.Conn, cfg config.Config) {
 
 	logging.Logf("debug", "conn#%d accepted local client %s", id, local.RemoteAddr())
 
-	remote, err := dialTLS(cfg, dialTimeout)
+	remote, err := dialTLSWithRetry(cfg)
 	if err != nil {
 		logging.Logf("error", "conn#%d TLS dial to %s failed: %v", id, cfg.RemoteAddr, err)
 		return
