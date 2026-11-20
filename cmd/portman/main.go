@@ -93,6 +93,14 @@ func validate(cfg Config) error {
 
 func main() {
 	configFile := flag.String("config", "config.json", "path to config file")
+
+	showVersion := flag.Bool("version", false, "print version and exit")
+	flag.Parse()
+	if *showVersion {
+		fmt.Printf("portman %s (commit %s, built %s)\n", version, commit, date)
+		return
+	}
+
 	flag.Parse()
 
 	file, err := os.Open(*configFile)
