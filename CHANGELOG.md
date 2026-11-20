@@ -23,3 +23,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - Client retries the TLS connection up to 3 times, waiting 1s and then 2s, before it drops a local connection.
+- Logs include microsecond timestamps, the local port used for each tunnel, and the time each TLS dial took.

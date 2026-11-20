@@ -36,6 +36,7 @@ func handleClientConn(local net.Conn, cfg config.Config) {
 
 	logging.Logf("debug", "conn#%d accepted local client %s", id, local.RemoteAddr())
 
+	dialStart := time.Now()
 	remote, err := dialTLSWithRetry(cfg)
 	if err != nil {
 		logging.Logf("error", "conn#%d TLS dial to %s failed: %v", id, cfg.RemoteAddr, err)
@@ -43,7 +44,8 @@ func handleClientConn(local net.Conn, cfg config.Config) {
 	}
 	defer remote.Close()
 
-	logging.Logf("info", "conn#%d tunnel up to %s", id, cfg.RemoteAddr)
+	logging.Logf("info", "conn#%d tunnel up to %s from local port %s, dial took %s",
+		id, cfg.RemoteAddr, remote.LocalAddr(), time.Since(dialStart).Round(time.Millisecond))
 
 	relay(local, remote, id, "local->remote", "remote->local")
 

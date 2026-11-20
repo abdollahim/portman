@@ -118,7 +118,7 @@ func main() {
 	defer logFile.Close()
 
 	log.SetOutput(io.MultiWriter(os.Stdout, logFile))
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 
 	mode := "client"
 	if isServer(cfg) {
