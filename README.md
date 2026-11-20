@@ -23,7 +23,7 @@ Releases use [Semantic Versioning](https://semver.org/) and are tagged `vX.Y.Z`.
 ## Build
 
 ```bash
-go build -o portman .
+go build -o dist/portman ./cmd/portman
 ```
 
 ## Configuration
