@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- README updated for v0.2.0: current build and config paths, service templates, tests, reliability and logging notes.
+
 ## [0.2.0] - 2026-11-20
 
 ### Added

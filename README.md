@@ -8,23 +8,41 @@ Portman does not parse the traffic. It is a byte pipe, so the backend must accep
 
 ## Status
 
-Experimental (v0.1.0). The TLS tunnel and logging work, but the project has not yet been tested with a full production workload.
+Experimental (v0.2.0). Tested end to end with one client and one server, carrying real traffic. It has not been tested under production load or with multiple clients.
 
 ## Versioning
 
 Releases use [Semantic Versioning](https://semver.org/) and are tagged `vX.Y.Z`. Until 1.0.0, a minor version may change configuration or behavior. See [CHANGELOG.md](CHANGELOG.md) for what changed in each release.
 
+Check the installed version with:
+
+```bash
+portman -version
+```
+
 ## Requirements
 
-- Go 1.21 or newer
+- Go 1.21 or newer, to build from source
 - A hostname with a valid certificate on the server (Let's Encrypt works)
 - Linux with systemd, if you want to run it as a service
 
 ## Build
 
+Build the binary into `dist/`:
+
 ```bash
 go build -o dist/portman ./cmd/portman
 ```
+
+`release.ps1` (Windows PowerShell) runs the vet, format, and test checks, then builds Linux and Windows binaries with the version and commit embedded, and writes SHA-256 checksums.
+
+## Tests
+
+```bash
+go test ./...
+```
+
+The tests cover config loading and validation, log levels, the server's TLS forwarding with an echo backend, and the client's dial retry.
 
 ## Configuration
 
@@ -41,7 +59,7 @@ Portman reads one JSON file, passed with `-config`. Mode is chosen by the `mode`
 | `log_level` | both | `debug`, `info`, `warn`, or `error` |
 | `log_path` | both | Log file; output also goes to stdout |
 
-Examples are in `config.server.example.json` and `config.client.example.json`.
+Examples are in `configs/server.example.json` and `configs/client.example.json`. Copy one and edit it. Don't commit your real config.
 
 ## Running as a service (Linux, systemd)
 
@@ -149,9 +167,13 @@ sudo systemctl restart portman-server   # or portman-client
 
 ## Logging
 
-At `debug`, each connection logs its ID, its byte counts per direction, and its duration. At `info`, it logs bridging and close events. Use `info` in production, because `debug` logs every connection.
+At `debug`, each connection logs its ID, its byte counts per direction, and its duration. At `info`, it logs bridging and close events, and each client tunnel logs the local port it used and how long the TLS dial took. Use `info` in production, because `debug` logs every connection.
 
 Startup checks log whether the remote TCP port and TLS handshake are reachable. They only log results and never stop the service.
+
+## Reliability
+
+The client retries a failed TLS dial up to 3 times, waiting 1 second and then 2 seconds between attempts. This helps on unstable links. The retry adds delay when the remote server is down: a local connection can wait for three dial timeouts before it fails.
 
 ## Security notes
 
@@ -160,11 +182,10 @@ Startup checks log whether the remote TCP port and TLS handshake are reachable. 
 
 ## Limitations
 
-- No authentication, multiplexing, or connection pooling. Each local connection opens its own TLS connection.
+- No authentication, multiplexing, or connection pooling. Each local connection opens its own TLS connection, so each new connection pays the handshake cost. Enabling multiplexing in the backend (for example, Xray mux) avoids this.
 - No protocol awareness. Protocol and identity must match between client-side and backend.
 - One listener per process.
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
-EOF
