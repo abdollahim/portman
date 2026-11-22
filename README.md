@@ -61,6 +61,174 @@ Portman reads one JSON file, passed with `-config`. Mode is chosen by the `mode`
 
 Examples are in `configs/server.example.json` and `configs/client.example.json`. Copy one and edit it. Don't commit your real config.
 
+## Example setup
+
+This example uses two servers:
+
+- **Inside server:** where your devices connect. It runs 3X-UI and a portman client.
+- **Foreign server:** where traffic exits to the internet. It runs 3X-UI and a portman server.
+
+```
+phone -> inside 3X-UI inbound -> outbound "portman" -> portman client (127.0.0.1:20001)
+      -> TLS -> portman server (FOREIGN_IP:4443) -> foreign 3X-UI inbound (127.0.0.1:10000) -> internet
+```
+
+### Prerequisites
+
+- A hostname for the bridge, for example `bridge.example.com`, with a **DNS-only** A record pointing to the foreign server's IP. If the record is proxied through Cloudflare, the bridge port won't work, because Cloudflare only forwards web ports.
+- A valid certificate for that hostname on the foreign server. Let's Encrypt works. The certificate's name must match `server_name` in the client config.
+- Port 4443 open on the foreign server, and only from the inside server's IP if you can restrict it.
+
+Replace these placeholders everywhere:
+
+| Placeholder | Meaning |
+|---|---|
+| `bridge.example.com` | Bridge hostname (DNS-only, certificate name) |
+| `FOREIGN_IP` | Public IP of the foreign server |
+| `YOUR-BRIDGE-UUID` | A new UUID you create, used only for the bridge |
+
+Generate a UUID with `uuidgen` on Linux, or `[guid]::NewGuid()` in PowerShell.
+
+### Portman server config (foreign server)
+
+`/etc/portman/server.json`:
+
+```json
+{
+  "mode": "server",
+  "listen_addr": ":4443",
+  "backend_addr": "127.0.0.1:10000",
+  "cert_file": "/etc/letsencrypt/live/bridge.example.com/fullchain.pem",
+  "key_file": "/etc/letsencrypt/live/bridge.example.com/privkey.pem",
+  "log_level": "info",
+  "log_path": "/var/log/portman/portman.log"
+}
+```
+
+### Portman client config (inside server)
+
+`/etc/portman/client.json`:
+
+```json
+{
+  "mode": "client",
+  "listen_addr": "127.0.0.1:20001",
+  "remote_addr": "bridge.example.com:4443",
+  "server_name": "bridge.example.com",
+  "log_level": "info",
+  "log_path": "/var/log/portman/portman.log"
+}
+```
+
+Set `log_level` to `debug` only while testing.
+
+### 3X-UI on the foreign server: bridge inbound
+
+Add a new inbound. It only listens on localhost, so the internet can't reach it directly.
+
+| Field | Value |
+|---|---|
+| Protocol | VLESS |
+| Listen IP | `127.0.0.1` |
+| Port | `10000` |
+| Network | tcp |
+| Security | none |
+
+Add one client:
+
+| Field | Value |
+|---|---|
+| ID | `YOUR-BRIDGE-UUID` |
+| Flow | empty |
+| Email / remark | `portman-bridge` |
+
+Keep this UUID separate from the UUIDs you give your devices. Anyone with it can use the foreign server through the bridge.
+
+### 3X-UI on the inside server: outbound and routing
+
+**1. Add the outbound.** In **Xray Configs → Outbounds**, add:
+
+| Field | Value |
+|---|---|
+| Protocol | VLESS |
+| Tag | `portman` |
+| Address | `127.0.0.1` |
+| Port | `20001` |
+| ID | `YOUR-BRIDGE-UUID` |
+| Encryption | none |
+| Network | tcp |
+| Security | none |
+| Mux | off (for the first test) |
+
+For reference, the outbound in JSON looks like this:
+
+```json
+{
+  "tag": "portman",
+  "protocol": "vless",
+  "settings": {
+    "vnext": [
+      {
+        "address": "127.0.0.1",
+        "port": 20001,
+        "users": [
+          { "id": "YOUR-BRIDGE-UUID", "encryption": "none" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**2. Add a routing rule.** In **Routing**, send the traffic you want through the bridge to the `portman` outbound. For example, if your devices use an inbound named `phone-in`:
+
+```json
+{
+  "type": "field",
+  "inboundTag": ["phone-in"],
+  "outboundTag": "portman"
+}
+```
+
+Keep the device's existing direct outbound for everything else. For testing, use a separate inbound for the bridge, so a broken bridge doesn't cut off your normal connection.
+
+**3. Restart Xray** from the 3X-UI panel.
+
+### Verify each hop
+
+On the foreign server, check that the bridge port listens on localhost only:
+
+```bash
+sudo ss -tlnp | grep 10000
+```
+
+Expected: `127.0.0.1:10000`.
+
+On the inside server, confirm the client is up and forwarding:
+
+```bash
+sudo journalctl -u portman-client -n 20 --no-pager
+```
+
+Expected: `client listening on 127.0.0.1:20001`, and after a connection, `tunnel up` followed by `closed after`.
+
+On the foreign server, confirm the server is forwarding:
+
+```bash
+sudo journalctl -u portman-server -n 20 --no-pager
+```
+
+Expected: `bridged` lines, then `client->backend finished` and `backend->client finished` with byte counts above zero.
+
+Finally, connect a device through the inside inbound, open a website, and check that the `portman-bridge` client's traffic counters increase in the foreign panel.
+
+### Common mistakes
+
+- **Wrong bridge port:** Portman listens on 4443, but the 3X-UI inbound listens on 10000 on localhost. Don't swap them.
+- **Mismatched UUID:** the inside outbound and the foreign inbound must use the same UUID. If they don't match, the foreign server closes the connection right away, with `0 bytes` in its logs.
+- **Mismatched protocol:** the outbound and inbound must both be VLESS with encryption `none` and no TLS of their own. TLS is handled by portman.
+- **Proxied hostname:** a Cloudflare-proxied hostname won't pass port 4443. Use a DNS-only record.
+
 ## Running as a service (Linux, systemd)
 
 These steps are for Debian and Ubuntu. Run them as root or with `sudo`.
