@@ -343,14 +343,71 @@ Startup checks log whether the remote TCP port and TLS handshake are reachable. 
 
 The client retries a failed TLS dial up to 3 times, waiting 1 second and then 2 seconds between attempts. This helps on unstable links. The retry adds delay when the remote server is down: a local connection can wait for three dial timeouts before it fails.
 
-## Security notes
+## Security
 
-- Portman does not authenticate clients. Anyone who can reach the server's listen port can open a TLS connection and send data to the backend. Keep the backend bound to `127.0.0.1` and protect it with its own authentication (for example, a VLESS UUID).
-- Do not commit real configs, certificates, or logs. `.gitignore` excludes the usual names.
+Portman does not authenticate clients. Anyone who can reach the listen port of the server can open a TLS connection and send data to the backend. Protect the server with the steps below.
+
+### Restrict the bridge port to your client
+
+On the foreign server, allow the bridge port only from the inside server's IP, then remove any rule that allows it from everywhere. Replace `INSIDE_IP` with the inside server's public IP:
+
+```bash
+sudo ufw allow from INSIDE_IP to any port 4443 proto tcp
+sudo ufw status numbered
+sudo ufw delete NUMBER   # the general "4443/tcp ALLOW IN Anywhere" rule, IPv4 and IPv6
+```
+
+Check that the open rule is gone with `sudo ufw status | grep 4443`. Only the `INSIDE_IP` rule should remain. If the inside server's IP changes, update the rule.
+
+### Keep the backend on localhost
+
+The backend should listen only on `127.0.0.1`, never on a public address. Check it with:
+
+```bash
+sudo ss -tlnp | grep 10000
+```
+
+The output should show `127.0.0.1:10000`. If it shows `0.0.0.0:10000` or `*:10000`, change the listen address in the 3X-UI inbound.
+
+### Use a separate identity for the bridge
+
+Give the bridge its own UUID, used only between the two servers. Don't reuse a device UUID. If a device is lost or the UUID leaks, create a new bridge UUID on both sides and remove the old one.
+
+### Run the service as an unprivileged user
+
+Use the hardened unit files in `deploy/`, which run as the `portman` user with `NoNewPrivileges` and a read-only system. Don't run portman as root. If you tested with an unhardened unit, switch to the templates in step 6 of the service setup.
+
+### Protect the config and logs
+
+- `/etc/portman` should be owned by `root` with group `portman`, mode `0750`, and config files mode `0640`. These files contain your hostnames and the bridge UUID.
+- `/var/log/portman` should be owned by `portman`, mode `0750`. Logs at `debug` level record every connection, including client IP addresses, so use `info` in production.
+
+### Protect the 3X-UI panel and SSH
+
+- Use a strong, unique password for each 3X-UI panel, and change the default panel path if your version allows it.
+- Restrict panel ports to your own IP with the same `ufw allow from` method, if you always connect from one address.
+- Use key-based SSH login, disable password login if you can, and keep `fail2ban` running with its `sshd` jail enabled.
+
+### Keep the system updated
+
+Run `sudo apt update && sudo apt upgrade` regularly on both servers, and update Xray and 3X-UI through their own update paths.
+
+### Verify downloads
+
+Each release includes `checksums-<version>.txt` with SHA-256 hashes. After downloading a binary, check it against the file:
+
+```bash
+sha256sum -c checksums-<version>.txt --ignore-missing
+```
+
+Expected output: `portman-<version>-linux-amd64: OK`. Don't install a binary whose hash doesn't match.
+
+### Report problems
+
+If you find a security issue, don't open a public issue with exploit details. Contact the maintainer privately first.
 
 ## Limitations
 
-- No authentication, multiplexing, or connection pooling. Each local connection opens its own TLS connection, so each new connection pays the handshake cost. Enabling multiplexing in the backend (for example, Xray mux) avoids this.
 - No protocol awareness. Protocol and identity must match between client-side and backend.
 - One listener per process.
 
