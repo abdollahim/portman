@@ -93,3 +93,35 @@ func TestLoadRejectsBadInput(t *testing.T) {
 		t.Fatal("expected error for missing file")
 	}
 }
+
+func TestMutualTLSFieldValidation(t *testing.T) {
+	client := Config{Mode: "client", ListenAddr: "127.0.0.1:20001", LogPath: "x.log", RemoteAddr: "h:4443"}
+	server := Config{
+		Mode: "server", ListenAddr: ":4443", LogPath: "x.log",
+		CertFile: "c.pem", KeyFile: "k.pem", BackendAddr: "127.0.0.1:10000",
+	}
+
+	cases := []struct {
+		name    string
+		base    Config
+		edit    func(*Config)
+		wantErr bool
+	}{
+		{"client cert with key", client, func(c *Config) { c.ClientCertFile = "c.pem"; c.ClientKeyFile = "k.pem" }, false},
+		{"client cert without key", client, func(c *Config) { c.ClientCertFile = "c.pem" }, true},
+		{"client key without cert", client, func(c *Config) { c.ClientKeyFile = "k.pem" }, true},
+		{"client with server CA", client, func(c *Config) { c.ClientCAFile = "ca.pem" }, true},
+		{"server with client CA", server, func(c *Config) { c.ClientCAFile = "ca.pem" }, false},
+		{"server with client cert", server, func(c *Config) { c.ClientCertFile = "c.pem"; c.ClientKeyFile = "k.pem" }, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := tc.base
+			tc.edit(&cfg)
+			err := cfg.Validate()
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Validate() error = %v, wantErr %v", err, tc.wantErr)
+			}
+		})
+	}
+}

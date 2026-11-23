@@ -19,3 +19,6 @@
 .vscode/
 .idea/
 .DS_Store
+
+# certificates and keys (for client authentication)
+/certificates/

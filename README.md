@@ -56,6 +56,8 @@ Portman reads one JSON file, passed with `-config`. Mode is chosen by the `mode`
 | `server_name` | client | TLS server name; must match the certificate |
 | `backend_addr` | server | Local backend to forward to, `host:port` |
 | `cert_file`, `key_file` | server | TLS certificate and key |
+| `client_ca_file` | server | CA certificate (PEM). When set, clients must present a certificate signed by it |
+| `client_cert_file`, `client_key_file` | client | Client certificate and key (PEM). Set both or neither |
 | `log_level` | both | `debug`, `info`, `warn`, or `error` |
 | `log_path` | both | Log file; output also goes to stdout |
 
@@ -345,7 +347,15 @@ The client retries a failed TLS dial up to 3 times, waiting 1 second and then 2 
 
 ## Security
 
-Portman does not authenticate clients. Anyone who can reach the listen port of the server can open a TLS connection and send data to the backend. Protect the server with the steps below.
+### Client authentication (optional)
+
+Set up mutual TLS so that only your inside server can use the bridge, even if the port is reachable. Generate the certificates on a trusted machine with the commands in the release notes, keep `ca.key` offline, and copy `ca.pem` to the server, and `client.pem` and `client.key` to the client.
+
+Server (`/etc/portman/server.json`): add `"client_ca_file": "/etc/portman/ca.pem"`.
+
+Client (`/etc/portman/client.json`): add `"client_cert_file": "/etc/portman/client.pem"` and `"client_key_file": "/etc/portman/client.key"`.
+
+Permissions: `ca.pem` and `client.pem` are public, so `0644` is fine. `client.key` is private: `root:portman`, mode `0640`.
 
 ### Restrict the bridge port to your client
 

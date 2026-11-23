@@ -15,8 +15,7 @@ This file lists planned work. Each item becomes a release when it's finished, te
 Problem: anyone who can reach the server's port can open a TLS connection and send data to the backend.
 
 Planned:
-- The server requires a client certificate signed by a private CA that you control (`client_ca_file` in the server config).
-- The client presents its own certificate and key (`client_cert_file`, `client_key_file`).
+- Opt-in: the server requires a client certificate only when `client_ca_file` is set. Existing configs keep working unchanged.- The client presents its own certificate and key (`client_cert_file`, `client_key_file`).
 - A small helper, documented in the README, creates the CA and client certificates.
 - Tests: a client without a certificate is rejected, a certificate from another CA is rejected, a valid certificate connects.
 

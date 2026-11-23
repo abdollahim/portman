@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - ROADMAP.md with planned versions: client authentication, hardening, daily Telegram report, release trust, connection reuse.
+- Optional mutual TLS. On the server, `client_ca_file` requires clients to present a certificate signed by that CA. On the client, `client_cert_file` and `client_key_file` supply the certificate.
+- Config validation for the new fields: the certificate and key must be set together, and each field is accepted only in the mode that uses it.
+- Tests for mutual TLS: a valid client is accepted, and a client with no certificate or with a certificate from another CA is rejected.
 
 ### Changed
 - README updated for v0.2.0: current build and config paths, service templates, tests, reliability and logging notes.

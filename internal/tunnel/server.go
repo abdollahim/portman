@@ -11,15 +11,15 @@ import (
 )
 
 func RunServer(cfg config.Config) {
-	cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
+	tlsCfg, err := serverTLSConfig(cfg)
 	if err != nil {
-		log.Fatalf("Error loading certificates: %v", err)
+		log.Fatalf("TLS setup: %v", err)
+	}
+	if cfg.ClientCAFile != "" {
+		logging.Logf("info", "client certificates required (client_ca_file set)")
 	}
 
-	listener, err := tls.Listen("tcp", cfg.ListenAddr, &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		MinVersion:   tls.VersionTLS12,
-	})
+	listener, err := tls.Listen("tcp", cfg.ListenAddr, tlsCfg)
 	if err != nil {
 		log.Fatalf("Server listener error on %s: %v", cfg.ListenAddr, err)
 	}
