@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- ROADMAP.md with planned versions: client authentication, hardening, daily Telegram report, release trust, connection reuse.
+
 ### Changed
 - README updated for v0.2.0: current build and config paths, service templates, tests, reliability and logging notes.
 - README: example setup for both servers, including portman configs and 3X-UI inbound, outbound, and routing steps.
