@@ -22,3 +22,8 @@
 
 # certificates and keys (for client authentication)
 /certificates/
+*.pem
+*.key
+*.csr
+*.srl
+*.ext
