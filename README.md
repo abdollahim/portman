@@ -62,6 +62,21 @@ Portman reads one JSON file, passed with `-config`. Mode is chosen by the `mode`
 | `idle_timeout` | both | Close a connection after this long with no data in either direction (default `5m`, for example `30m`) |
 | `log_level` | both | `debug`, `info`, `warn`, or `error` |
 | `log_path` | both | Log file; output also goes to stdout |
+| `stats.enabled` | both | Count traffic per day and save it to `stats.state_path` |
+| `stats.label` | both | Name shown in the report, for example `inside` |
+| `stats.state_path` | both | JSON state file, for example `/var/lib/portman/state.json` |
+| `stats.interface` | both | Network interface to count, for example `eth0` |
+| `stats.timezone` | both | Day and month boundaries, for example `Asia/Tehran` |
+| `stats.monthly_limit_gb` | both | Monthly limit in GiB; `0` means no limit line |
+| `stats.count_mode` | both | `sum` (in + out) or `max` (the larger of the two) |
+| `stats.sample_interval` | both | How often counters are read, for example `1m` |
+| `stats.listen_addr` | server | Where the stats endpoint listens, for example `:4444` |
+| `notify.enabled` | client | Send the daily report |
+| `notify.api_base` | client | Bale API base; default `https://tapi.bale.ai` |
+| `notify.bot_token` | client | Bale bot token |
+| `notify.chat_id` | client | Chat the report is sent to |
+| `notify.send_at` | client | Send time, `HH:MM`, in `stats.timezone` |
+| `notify.foreign_stats_addr` | client | Foreign stats endpoint, for example `bridge.example.com:4444` |
 
 Examples are in `configs/server.example.json` and `configs/client.example.json`. Copy one and edit it. Don't commit your real config.
 
@@ -346,6 +361,21 @@ Startup checks log whether the remote TCP port and TLS handshake are reachable. 
 ## Reliability
 
 The client retries a failed TLS dial up to 3 times, waiting 1 second and then 2 seconds between attempts. This helps on unstable links. The retry adds delay when the remote server is down: a local connection can wait for three dial timeouts before it fails.
+
+## Traffic stats and daily report
+
+With `stats.enabled`, each server counts traffic per day in its timezone and saves the totals to `stats.state_path`:
+
+- **Interface** counters come from `/proc/net/dev`. They include all traffic, including SSH, the panel, and direct connections. Providers bill this figure.
+- **Bridge** counters count only tunnel traffic.
+
+The inside server (`notify.enabled`) sends one plain-text report to a Bale bot every day at `notify.send_at`. It includes its own numbers, plus the foreign server's numbers, which it fetches over mutual TLS from `notify.foreign_stats_addr`. The foreign server serves them only when `stats.listen_addr` is set, and only with `client_ca_file` configured.
+
+Send a report immediately with `portman -config /etc/portman/config.json -report-now`.
+
+The bot token and chat ID live in the config file. Keep that file mode `0640` with group `portman`. The token is redacted from logs and errors.
+
+Limits: sampling runs every `sample_interval`, so an abrupt stop can lose up to one interval of counts. If the inside server is off at `send_at`, that day's report is not sent.
 
 ## Security
 

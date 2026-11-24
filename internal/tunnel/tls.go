@@ -93,3 +93,14 @@ func dialTLSWithRetry(cfg config.Config) (*tls.Conn, error) {
 	}
 	return nil, lastErr
 }
+
+// NewServerTLSConfig returns the server's TLS settings for use outside the tunnel.
+// The stats endpoint uses the same certificate and client CA.
+func NewServerTLSConfig(cfg config.Config) (*tls.Config, error) {
+	return serverTLSConfig(cfg)
+}
+
+// NewClientTLSConfig returns the client's TLS settings for connecting to the server.
+func NewClientTLSConfig(cfg config.Config) (*tls.Config, error) {
+	return clientTLSConfig(cfg)
+}

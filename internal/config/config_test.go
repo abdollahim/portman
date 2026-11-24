@@ -169,3 +169,64 @@ func TestHardeningValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestStatsAndNotifyValidation(t *testing.T) {
+	base := Config{
+		Mode: "client", ListenAddr: "127.0.0.1:20001", LogPath: "x.log",
+		RemoteAddr: "h:4443", ServerName: "h",
+		ClientCertFile: "c.pem", ClientKeyFile: "k.pem",
+	}
+	goodStats := Stats{Enabled: true, Label: "inside", StatePath: "s.json", Interface: "eth0", Timezone: "Asia/Tehran"}
+	goodNotify := Notify{Enabled: true, BotToken: "123456789:TOKEN", ChatID: "1", SendAt: "23:55", ForeignStatsAddr: "h:4444"}
+
+	cases := []struct {
+		name    string
+		edit    func(*Config)
+		wantErr bool
+	}{
+		{"stats only", func(c *Config) { c.Stats = goodStats }, false},
+		{"stats without label", func(c *Config) { c.Stats = goodStats; c.Stats.Label = "" }, true},
+		{"bad timezone", func(c *Config) { c.Stats = goodStats; c.Stats.Timezone = "Not/AZone" }, true},
+		{"bad count mode", func(c *Config) { c.Stats = goodStats; c.Stats.CountMode = "avg" }, true},
+		{"sample interval too short", func(c *Config) { c.Stats = goodStats; c.Stats.SampleInterval = "5s" }, true},
+		{"stats listen on client", func(c *Config) { c.Stats = goodStats; c.Stats.ListenAddr = ":4444" }, true},
+		{"notify without stats", func(c *Config) { c.Notify = goodNotify }, true},
+		{"notify valid", func(c *Config) { c.Stats = goodStats; c.Notify = goodNotify }, false},
+		{"notify without token", func(c *Config) { c.Stats = goodStats; c.Notify = goodNotify; c.Notify.BotToken = "" }, true},
+		{"bad send_at", func(c *Config) { c.Stats = goodStats; c.Notify = goodNotify; c.Notify.SendAt = "25:99" }, true},
+		{"foreign fetch without client cert", func(c *Config) {
+			c.Stats = goodStats
+			c.Notify = goodNotify
+			c.ClientCertFile, c.ClientKeyFile = "", ""
+		}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := base
+			tc.edit(&cfg)
+			err := cfg.Validate()
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Validate() error = %v, wantErr %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestServerStatsRequiresClientCA(t *testing.T) {
+	server := Config{
+		Mode: "server", ListenAddr: ":4443", LogPath: "x.log",
+		CertFile: "c.pem", KeyFile: "k.pem", BackendAddr: "127.0.0.1:10000",
+		Stats: Stats{Enabled: true, Label: "foreign", StatePath: "s.json", Interface: "eth0", ListenAddr: ":4444"},
+	}
+	if err := server.Validate(); err == nil {
+		t.Fatal("stats endpoint without client_ca_file must be refused")
+	}
+	server.ClientCAFile = "ca.pem"
+	if err := server.Validate(); err != nil {
+		t.Fatalf("with client_ca_file it should be valid: %v", err)
+	}
+	server.Notify = Notify{Enabled: true}
+	if err := server.Validate(); err == nil {
+		t.Fatal("notify must be refused on the server")
+	}
+}

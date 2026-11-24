@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Daily traffic report sent to a Bale bot from the inside server at `notify.send_at`.
+- Per-day counters on both servers: interface traffic (what providers bill) and bridge traffic (tunnel only), saved to a state file that survives restarts.
+- Foreign server serves its counters over mutual TLS at `stats.listen_addr`. The endpoint is refused unless `client_ca_file` is set.
+- `monthly_limit_gb` and `count_mode` show month-to-date usage against a limit.
+- `-report-now` sends one report and exits.
+- Registered secrets (the bot token) are redacted from all log lines and errors.
+
 ## [0.4.0] - 2026-11-24
 
 ### Added

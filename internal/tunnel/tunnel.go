@@ -4,6 +4,8 @@ package tunnel
 import (
 	"sync/atomic"
 	"time"
+
+	"portman/internal/stats"
 )
 
 const (
@@ -15,6 +17,14 @@ const (
 
 // connSeq numbers connections so client and server log lines can be matched.
 var connSeq atomic.Uint64
+
+// recorder receives bridge traffic counts. It is stats.Discard until SetRecorder is called.
+var recorder stats.Recorder = stats.Discard{}
+
+// SetRecorder sets where bridge traffic is counted. Call it before the listeners start.
+func SetRecorder(r stats.Recorder) {
+	recorder = r
+}
 
 // limiter caps the number of connections handled at once.
 type limiter chan struct{}

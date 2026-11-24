@@ -56,6 +56,7 @@ func handleClientConn(local net.Conn, cfg config.Config) {
 
 	logging.Logf("info", "conn#%d tunnel up to %s from local port %s, dial took %s",
 		id, cfg.RemoteAddr, remote.LocalAddr(), time.Since(dialStart).Round(time.Millisecond))
+	recorder.AddConn()
 
 	relay(local, remote, id, "local->remote", "remote->local", cfg.IdleDuration())
 

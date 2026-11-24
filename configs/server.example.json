@@ -4,6 +4,18 @@
   "backend_addr": "127.0.0.1:10000",
   "cert_file": "/etc/letsencrypt/live/bridge.example.com/fullchain.pem",
   "key_file": "/etc/letsencrypt/live/bridge.example.com/privkey.pem",
+  "client_ca_file": "/etc/portman/ca.pem",
   "log_level": "info",
-  "log_path": "/var/log/portman/portman.log"
+  "log_path": "/var/log/portman/server.log",
+  "stats": {
+    "enabled": true,
+    "label": "foreign",
+    "state_path": "/var/lib/portman/state.json",
+    "interface": "eth0",
+    "timezone": "Asia/Tehran",
+    "monthly_limit_gb": 0,
+    "count_mode": "sum",
+    "sample_interval": "1m",
+    "listen_addr": ":4444"
+  }
 }

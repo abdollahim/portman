@@ -3,6 +3,26 @@
   "listen_addr": "127.0.0.1:20001",
   "remote_addr": "bridge.example.com:4443",
   "server_name": "bridge.example.com",
+  "client_cert_file": "/etc/portman/client.pem",
+  "client_key_file": "/etc/portman/client.key",
   "log_level": "info",
-  "log_path": "/var/log/portman/portman.log"
+  "log_path": "/var/log/portman/client.log",
+  "stats": {
+    "enabled": true,
+    "label": "inside",
+    "state_path": "/var/lib/portman/state.json",
+    "interface": "eth0",
+    "timezone": "Asia/Tehran",
+    "monthly_limit_gb": 100,
+    "count_mode": "sum",
+    "sample_interval": "1m"
+  },
+  "notify": {
+    "enabled": true,
+    "api_base": "https://tapi.bale.ai",
+    "bot_token": "PASTE_BALE_BOT_TOKEN",
+    "chat_id": "PASTE_CHAT_ID",
+    "send_at": "23:55",
+    "foreign_stats_addr": "bridge.example.com:4444"
+  }
 }

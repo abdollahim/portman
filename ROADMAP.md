@@ -12,17 +12,9 @@ This file lists planned work. Each item becomes a release when it's finished, te
 
 ## Next
 
-### 0.5.0: Daily traffic report to Telegram
+### 0.5.0: Daily traffic report (Bale)
 
-Goal: a configurable notifier that sends a message to a Telegram bot at a fixed time each day, reporting traffic that passed through the bridge during that day.
-
-Planned:
-- Byte and connection counters per day, kept on the server, with totals saved to a small state file so a restart doesn't reset the day.
-- A `notify` section in the config: enabled flag, time of day to send, timezone, bot token file, chat ID. The token is read from a file with mode `0600`, never put inline in the config and never logged.
-- Retries on send failure, and a log line when a send fails.
-- Message format to be decided when this version starts. It may include bytes in each direction, connection count, and comparison with the previous day.
-
-Before this version starts, confirm that the server running the notifier can reach the Telegram API. In some networks it's blocked, and the notifier would then need to run on a different host or through another route.
+Daily report from the inside server to a Bale bot, covering both servers. Per-day interface and bridge counters are kept in a state file, the foreign server serves its counters over mutual TLS, and the monthly limit is shown against each server's usage.
 
 ### 0.6.0: Release trust and operations
 

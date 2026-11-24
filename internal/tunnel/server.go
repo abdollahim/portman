@@ -72,6 +72,7 @@ func handleServerConn(conn net.Conn, cfg config.Config) {
 	defer backend.Close()
 
 	logging.Logf("info", "conn#%d bridged %s <-> backend %s", id, conn.RemoteAddr(), cfg.BackendAddr)
+	recorder.AddConn()
 
 	relay(conn, backend, id, "client->backend", "backend->client", cfg.IdleDuration())
 

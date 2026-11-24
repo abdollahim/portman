@@ -68,3 +68,19 @@ func TestPrivateKeyIsRedacted(t *testing.T) {
 		t.Fatalf("text after the key should be kept: %q", out)
 	}
 }
+
+func TestSecretIsRedacted(t *testing.T) {
+	buf := captureLog(t)
+	SetLevel("info")
+	AddSecret("123456789:AAFakeBotTokenValue")
+
+	Logf("error", "request to https://example.test/bot123456789:AAFakeBotTokenValue/sendMessage failed")
+
+	out := buf.String()
+	if strings.Contains(out, "AAFakeBotTokenValue") {
+		t.Fatalf("secret leaked into log: %q", out)
+	}
+	if !strings.Contains(out, "[redacted]") {
+		t.Fatalf("expected placeholder in log: %q", out)
+	}
+}

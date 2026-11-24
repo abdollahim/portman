@@ -39,10 +39,11 @@ func isTimeout(err error) bool {
 	return errors.As(err, &ne) && ne.Timeout()
 }
 
-// copyStream copies src to dst, logs the byte count and any error,
-// then half-closes dst so the peer sees EOF.
-func copyStream(dst, src net.Conn, id uint64, dir string) {
+// copyStream copies src to dst, reports the byte count through count,
+// logs any error, then half-closes dst so the peer sees EOF.
+func copyStream(dst, src net.Conn, id uint64, dir string, count func(int64)) {
 	n, err := io.Copy(dst, src)
+	count(n)
 	switch {
 	case err == nil || errors.Is(err, io.EOF):
 		logging.Logf("debug", "conn#%d %s finished, %d bytes", id, dir, n)
@@ -60,17 +61,18 @@ func copyStream(dst, src net.Conn, id uint64, dir string) {
 
 // relay runs both directions with an idle timeout on each side. When one
 // direction ends, the other gets drainTimeout to finish, then both are closed.
+// Bytes sent from a to b count as upload; bytes from b to a count as download.
 func relay(a, b net.Conn, id uint64, aToB, bToA string, idle time.Duration) {
 	a = idleConn{Conn: a, idle: idle}
 	b = idleConn{Conn: b, idle: idle}
 
 	done := make(chan struct{}, 2)
 	go func() {
-		copyStream(b, a, id, aToB)
+		copyStream(b, a, id, aToB, recorder.AddUp)
 		done <- struct{}{}
 	}()
 	go func() {
-		copyStream(a, b, id, bToA)
+		copyStream(a, b, id, bToA, recorder.AddDown)
 		done <- struct{}{}
 	}()
 
