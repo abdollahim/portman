@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-24
+
 ### Added
 - Daily traffic report sent to a Bale bot from the inside server at `notify.send_at`.
 - Per-day counters on both servers: interface traffic (what providers bill) and bridge traffic (tunnel only), saved to a state file that survives restarts.
