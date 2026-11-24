@@ -16,7 +16,9 @@ func RunClient(cfg config.Config) {
 	}
 	defer listener.Close()
 
-	logging.Logf("info", "client listening on %s, tunnel to %s", cfg.ListenAddr, cfg.RemoteAddr)
+	slots := newLimiter(cfg.MaxConn())
+	logging.Logf("info", "client listening on %s, tunnel to %s (max %d connections, idle timeout %s)",
+		cfg.ListenAddr, cfg.RemoteAddr, cfg.MaxConn(), cfg.IdleDuration())
 
 	for {
 		conn, err := listener.Accept()
@@ -25,7 +27,15 @@ func RunClient(cfg config.Config) {
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
-		go handleClientConn(conn, cfg)
+		if !slots.acquire() {
+			logging.Logf("warn", "connection limit %d reached, dropping local client %s", cfg.MaxConn(), conn.RemoteAddr())
+			conn.Close()
+			continue
+		}
+		go func() {
+			defer slots.release()
+			handleClientConn(conn, cfg)
+		}()
 	}
 }
 
@@ -47,7 +57,7 @@ func handleClientConn(local net.Conn, cfg config.Config) {
 	logging.Logf("info", "conn#%d tunnel up to %s from local port %s, dial took %s",
 		id, cfg.RemoteAddr, remote.LocalAddr(), time.Since(dialStart).Round(time.Millisecond))
 
-	relay(local, remote, id, "local->remote", "remote->local")
+	relay(local, remote, id, "local->remote", "remote->local", cfg.IdleDuration())
 
 	logging.Logf("info", "conn#%d closed after %s", id, time.Since(start).Round(time.Millisecond))
 }

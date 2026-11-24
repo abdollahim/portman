@@ -5,6 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-24
+
+### Added
+- `max_connections` (default 256): caps concurrent connections per process. Extra connections are dropped with a warning.
+- `idle_timeout` (default `5m`): closes a relayed connection after no data has moved in either direction for this long.
+- Startup warning when a config, log, or private key file is readable by users other than its owner and group.
+- Private key blocks are redacted from log lines.
+- Tests for the connection limit, the idle timeout, the config defaults and validation, and log redaction.
+
+### Changed
+- New log files are created with mode `0640` (was `0644`).
+- When one direction of a relay ends, the other gets the drain timeout to finish, then both sides are closed. The result is the same as before, but the implementation no longer relies on connection deadlines.
+- Connections closed by the idle timeout or by the drain timeout are logged at info or debug level, not as warnings.
+
 ## [0.3.0] - 2026-11-23
 
 ### Added

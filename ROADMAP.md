@@ -7,27 +7,10 @@ This file lists planned work. Each item becomes a release when it's finished, te
 
 - **0.1.0**: TLS tunnel, server and client modes, logging, startup checks, config validation.
 - **0.2.0**: Dial retry, timing logs, `-version` flag, unit and integration tests, release script with test gate.
+- **0.3.0**: Optional mutual TLS. The server requires client certificates when `client_ca_file` is set, and existing configs keep working unchanged.
+- **0.4.0**: Connection limit, idle timeout, log file permissions with startup warnings, private key redaction in logs.
 
 ## Next
-
-### 0.3.0: Client authentication (mutual TLS)
-
-Problem: anyone who can reach the server's port can open a TLS connection and send data to the backend.
-
-Planned:
-- Opt-in: the server requires a client certificate only when `client_ca_file` is set. Existing configs keep working unchanged.- The client presents its own certificate and key (`client_cert_file`, `client_key_file`).
-- A small helper, documented in the README, creates the CA and client certificates.
-- Tests: a client without a certificate is rejected, a certificate from another CA is rejected, a valid certificate connects.
-
-This changes how the server accepts connections, so it's a minor bump under the pre-1.0 rules. The changelog will list the new config fields and the migration steps.
-
-### 0.4.0: Hardening
-
-Planned:
-- Maximum concurrent connections per server (configurable, with a sensible default).
-- Idle timeout for relayed connections, so stalled connections are closed.
-- Log file created with mode `0640`, and a startup warning if an existing log or config file is readable by other users.
-- Log lines never include secrets (tokens, UUIDs, certificate keys). This is checked by a test.
 
 ### 0.5.0: Daily traffic report to Telegram
 

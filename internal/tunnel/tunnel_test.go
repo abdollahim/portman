@@ -10,6 +10,7 @@ import (
 	"io"
 	"math/big"
 	"net"
+	"portman/internal/config"
 	"testing"
 	"time"
 )
@@ -77,7 +78,7 @@ func TestServerForwardsEchoRoundTrip(t *testing.T) {
 			if err != nil {
 				return
 			}
-			go handleServerConn(c, backendAddr)
+			go handleServerConn(c, config.Config{BackendAddr: backendAddr})
 		}
 	}()
 

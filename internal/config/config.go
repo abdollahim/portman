@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 )
 
 type Config struct {
@@ -18,8 +19,32 @@ type Config struct {
 	ClientCAFile   string `json:"client_ca_file,omitempty"`
 	ClientCertFile string `json:"client_cert_file,omitempty"`
 	ClientKeyFile  string `json:"client_key_file,omitempty"`
+	MaxConnections int    `json:"max_connections,omitempty"`
+	IdleTimeout    string `json:"idle_timeout,omitempty"`
 	LogLevel       string `json:"log_level"`
 	LogPath        string `json:"log_path"`
+}
+
+const (
+	defaultMaxConnections = 256
+	defaultIdleTimeout    = 5 * time.Minute
+)
+
+// MaxConn returns the connection limit, using the default when unset.
+func (c Config) MaxConn() int {
+	if c.MaxConnections <= 0 {
+		return defaultMaxConnections
+	}
+	return c.MaxConnections
+}
+
+// IdleDuration returns the idle timeout, using the default when unset or invalid.
+func (c Config) IdleDuration() time.Duration {
+	d, err := time.ParseDuration(c.IdleTimeout)
+	if err != nil || d <= 0 {
+		return defaultIdleTimeout
+	}
+	return d
 }
 
 // Load reads and validates a config file.
@@ -53,6 +78,15 @@ func (c Config) Validate() error {
 	}
 	if c.LogPath == "" {
 		return errors.New("log_path is required")
+	}
+	if c.MaxConnections < 0 {
+		return errors.New("max_connections cannot be negative")
+	}
+	if c.IdleTimeout != "" {
+		d, err := time.ParseDuration(c.IdleTimeout)
+		if err != nil || d <= 0 {
+			return errors.New("idle_timeout must be a positive duration such as 5m")
+		}
 	}
 	if c.IsServer() {
 		if c.CertFile == "" || c.KeyFile == "" {

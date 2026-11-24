@@ -58,6 +58,8 @@ Portman reads one JSON file, passed with `-config`. Mode is chosen by the `mode`
 | `cert_file`, `key_file` | server | TLS certificate and key |
 | `client_ca_file` | server | CA certificate (PEM). When set, clients must present a certificate signed by it |
 | `client_cert_file`, `client_key_file` | client | Client certificate and key (PEM). Set both or neither |
+| `max_connections` | both | Maximum concurrent connections per process (default 256). Extra connections are dropped |
+| `idle_timeout` | both | Close a connection after this long with no data in either direction (default `5m`, for example `30m`) |
 | `log_level` | both | `debug`, `info`, `warn`, or `error` |
 | `log_path` | both | Log file; output also goes to stdout |
 
@@ -356,6 +358,8 @@ Server (`/etc/portman/server.json`): add `"client_ca_file": "/etc/portman/ca.pem
 Client (`/etc/portman/client.json`): add `"client_cert_file": "/etc/portman/client.pem"` and `"client_key_file": "/etc/portman/client.key"`.
 
 Permissions: `ca.pem` and `client.pem` are public, so `0644` is fine. `client.key` is private: `root:portman`, mode `0640`.
+
+Portman also limits concurrent connections and closes idle ones, so a stalled or flooding client can't use up the server. Adjust `max_connections` and `idle_timeout` in the config if your traffic needs more.
 
 ### Restrict the bridge port to your client
 

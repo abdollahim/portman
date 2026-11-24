@@ -15,3 +15,24 @@ const (
 
 // connSeq numbers connections so client and server log lines can be matched.
 var connSeq atomic.Uint64
+
+// limiter caps the number of connections handled at once.
+type limiter chan struct{}
+
+func newLimiter(n int) limiter {
+	return make(limiter, n)
+}
+
+// acquire takes a slot without blocking. It returns false when the limit is reached.
+func (l limiter) acquire() bool {
+	select {
+	case l <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (l limiter) release() {
+	<-l
+}

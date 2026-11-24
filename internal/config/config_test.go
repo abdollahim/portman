@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestIsServer(t *testing.T) {
@@ -117,6 +118,49 @@ func TestMutualTLSFieldValidation(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := tc.base
+			tc.edit(&cfg)
+			err := cfg.Validate()
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Validate() error = %v, wantErr %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestHardeningDefaults(t *testing.T) {
+	var cfg Config
+	if cfg.MaxConn() != 256 {
+		t.Fatalf("MaxConn() = %d, want 256", cfg.MaxConn())
+	}
+	if cfg.IdleDuration() != 5*time.Minute {
+		t.Fatalf("IdleDuration() = %v, want 5m", cfg.IdleDuration())
+	}
+
+	cfg.MaxConnections = 10
+	cfg.IdleTimeout = "30s"
+	if cfg.MaxConn() != 10 {
+		t.Fatalf("MaxConn() = %d, want 10", cfg.MaxConn())
+	}
+	if cfg.IdleDuration() != 30*time.Second {
+		t.Fatalf("IdleDuration() = %v, want 30s", cfg.IdleDuration())
+	}
+}
+
+func TestHardeningValidation(t *testing.T) {
+	base := Config{Mode: "client", ListenAddr: "127.0.0.1:20001", LogPath: "x.log", RemoteAddr: "h:4443"}
+	cases := []struct {
+		name    string
+		edit    func(*Config)
+		wantErr bool
+	}{
+		{"valid idle timeout", func(c *Config) { c.IdleTimeout = "5m" }, false},
+		{"bad idle timeout", func(c *Config) { c.IdleTimeout = "bogus" }, true},
+		{"zero idle timeout", func(c *Config) { c.IdleTimeout = "0s" }, true},
+		{"negative max connections", func(c *Config) { c.MaxConnections = -1 }, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := base
 			tc.edit(&cfg)
 			err := cfg.Validate()
 			if (err != nil) != tc.wantErr {

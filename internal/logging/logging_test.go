@@ -50,3 +50,21 @@ func TestUnknownLevelFallsBackToInfo(t *testing.T) {
 		t.Fatalf("info line missing: %q", out)
 	}
 }
+
+func TestPrivateKeyIsRedacted(t *testing.T) {
+	buf := captureLog(t)
+	SetLevel("info")
+
+	Logf("info", "loaded key:\n-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIFakeKeyMaterial\n-----END EC PRIVATE KEY-----\ndone")
+
+	out := buf.String()
+	if strings.Contains(out, "MHcCAQEEIFakeKeyMaterial") || strings.Contains(out, "PRIVATE KEY") {
+		t.Fatalf("private key leaked into log: %q", out)
+	}
+	if !strings.Contains(out, "[redacted private key]") {
+		t.Fatalf("expected placeholder in log: %q", out)
+	}
+	if !strings.Contains(out, "done") {
+		t.Fatalf("text after the key should be kept: %q", out)
+	}
+}

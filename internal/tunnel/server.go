@@ -25,7 +25,9 @@ func RunServer(cfg config.Config) {
 	}
 	defer listener.Close()
 
-	logging.Logf("info", "server listening on %s, forwarding to backend %s", cfg.ListenAddr, cfg.BackendAddr)
+	slots := newLimiter(cfg.MaxConn())
+	logging.Logf("info", "server listening on %s, forwarding to backend %s (max %d connections, idle timeout %s)",
+		cfg.ListenAddr, cfg.BackendAddr, cfg.MaxConn(), cfg.IdleDuration())
 
 	for {
 		conn, err := listener.Accept()
@@ -34,11 +36,19 @@ func RunServer(cfg config.Config) {
 			time.Sleep(100 * time.Millisecond) // avoid a hot loop on persistent errors
 			continue
 		}
-		go handleServerConn(conn, cfg.BackendAddr)
+		if !slots.acquire() {
+			logging.Logf("warn", "connection limit %d reached, dropping %s", cfg.MaxConn(), conn.RemoteAddr())
+			conn.Close()
+			continue
+		}
+		go func() {
+			defer slots.release()
+			handleServerConn(conn, cfg)
+		}()
 	}
 }
 
-func handleServerConn(conn net.Conn, backendAddr string) {
+func handleServerConn(conn net.Conn, cfg config.Config) {
 	id := connSeq.Add(1)
 	start := time.Now()
 	defer conn.Close()
@@ -54,16 +64,16 @@ func handleServerConn(conn net.Conn, backendAddr string) {
 		_ = conn.SetDeadline(time.Time{})
 	}
 
-	backend, err := net.DialTimeout("tcp", backendAddr, dialTimeout)
+	backend, err := net.DialTimeout("tcp", cfg.BackendAddr, dialTimeout)
 	if err != nil {
-		logging.Logf("error", "conn#%d backend dial %s failed: %v", id, backendAddr, err)
+		logging.Logf("error", "conn#%d backend dial %s failed: %v", id, cfg.BackendAddr, err)
 		return
 	}
 	defer backend.Close()
 
-	logging.Logf("info", "conn#%d bridged %s <-> backend %s", id, conn.RemoteAddr(), backendAddr)
+	logging.Logf("info", "conn#%d bridged %s <-> backend %s", id, conn.RemoteAddr(), cfg.BackendAddr)
 
-	relay(conn, backend, id, "client->backend", "backend->client")
+	relay(conn, backend, id, "client->backend", "backend->client", cfg.IdleDuration())
 
 	logging.Logf("info", "conn#%d closed after %s", id, time.Since(start).Round(time.Millisecond))
 }
