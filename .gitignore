@@ -8,8 +8,9 @@
 *.txt
 
 # real configs: only example configs are tracked
+/configs/
 *.json
-!configs/*.example.json
+!examples/*.json
 
 # logs and captures
 *.log

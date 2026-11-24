@@ -23,6 +23,6 @@
     "bot_token": "PASTE_BALE_BOT_TOKEN",
     "chat_id": "PASTE_CHAT_ID",
     "send_at": "23:55",
-    "foreign_stats_addr": "bridge.example.com:4444"
+    "foreign_stats_addr": "bridge.example.com:8444"
   }
 }

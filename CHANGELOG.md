@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-24
+
+### Changed
+- Example configs are now `examples/server.json` and `examples/client.json`.
+- Service units use `StateDirectory` and `LogsDirectory`, so systemd creates `/var/lib/portman` and `/var/log/portman` owned by `portman`.
+- Example stats endpoint moved to port 8444. Some networks block 4444. The port is set by `stats.listen_addr` and `notify.foreign_stats_addr`, so no code change was needed.
+- README rewritten as a setup guide: service account, directories, certificates, firewall, 3X-UI configuration, daily report, operations, and troubleshooting.
+
+### Notes
+- No Go code changed in 0.5.1. Binaries built from 0.5.0 run the same code.
+
 ## [0.5.0] - 2026-11-24
 
 ### Added

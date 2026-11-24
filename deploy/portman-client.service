@@ -8,13 +8,18 @@ Type=simple
 User=portman
 Group=portman
 ExecStart=/usr/local/bin/portman -config /etc/portman/client.json
-Restart=always
+Restart=on-failure
 RestartSec=3
+
+StateDirectory=portman
+StateDirectoryMode=0750
+LogsDirectory=portman
+LogsDirectoryMode=0750
+
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/var/log/portman
 
 [Install]
 WantedBy=multi-user.target

@@ -16,6 +16,6 @@
     "monthly_limit_gb": 0,
     "count_mode": "sum",
     "sample_interval": "1m",
-    "listen_addr": ":4444"
+    "listen_addr": ":8444"
   }
 }
