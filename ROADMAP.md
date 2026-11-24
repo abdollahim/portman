@@ -9,7 +9,7 @@ This file lists planned work. Each item becomes a release when it's finished, te
 - **0.2.0**: Dial retry, timing logs, `-version` flag, unit and integration tests, release script with test gate.
 - **0.3.0**: Optional mutual TLS. The server requires client certificates when `client_ca_file` is set, and existing configs keep working unchanged.
 - **0.4.0**: Connection limit, idle timeout, log file permissions with startup warnings, private key redaction in logs.
-- **0.5.0**: Daily report from the inside server to a Bale bot, covering both servers. Per-day interface and bridge counters are kept in a state file, the foreign server serves its counters over mutual TLS, and the monthly limit is shown against each server's usage.
+- **0.5.0**: Daily traffic report to Bale covering both servers, per-day counters, monthly limit tracking.
 
 ## Next
 
