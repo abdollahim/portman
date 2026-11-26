@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-26
+
 ### Added
 - `stats.billing_day` (1 to 28, default 1): each server sets its own reset day. The report's cycle totals start on that day.
 
