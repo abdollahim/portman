@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
-- `stats.billing_day` accepts 1 to 31 (was 1 to 28). In a month shorter than the billing day, the cycle starts on the month's last day. Existing configs with 1 to 28 behave the same.
+- Documentation: `timezone`, `billing_day`, `monthly_limit_gb`, and `count_mode` are set per server to match that server's provider.
+
+### Added
+- Test confirming that each server keeps its own billing cycle.
 
 ## [0.6.0] - 2026-11-26
 

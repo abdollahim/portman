@@ -208,3 +208,19 @@ func TestCycleStartClampsToShortMonths(t *testing.T) {
 		}
 	}
 }
+
+func TestBillingDayIsPerStore(t *testing.T) {
+	var rx, tx uint64
+	a := openFake(t, &rx, &tx)
+	b := openFake(t, &rx, &tx)
+	a.SetBillingDay(27)
+	b.SetBillingDay(1)
+
+	now := on(time.November, 26, 12, 0)
+	if got := a.Snapshot(now).CycleStart; got != "2026-10-27" {
+		t.Fatalf("store a cycle = %q, want 2026-10-27", got)
+	}
+	if got := b.Snapshot(now).CycleStart; got != "2026-11-01" {
+		t.Fatalf("store b cycle = %q, want 2026-11-01", got)
+	}
+}

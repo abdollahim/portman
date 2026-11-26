@@ -83,7 +83,7 @@ go test ./...
 | `stats.label` | both | Name shown in the report |
 | `stats.state_path` | both | JSON state file, for example `/var/lib/portman/state.json` |
 | `stats.interface` | both | Network interface to count. Find it with `ip -br link` |
-| `stats.timezone` | both | Day and month boundaries, for example `Asia/Tehran`. Use the same value on both servers |
+| `stats.timezone` | both | Day and month boundaries for this server, for example `Asia/Tehran`. Set it to match that server's provider |
 | `stats.billing_day` | both | Day of the month when this server's cycle resets (1 to 31, default 1). If the month is shorter, the cycle starts on its last day. Set it to match that server's provider |
 | `stats.monthly_limit_gb` | both | Monthly limit in GiB. `0` means no limit line |
 | `stats.count_mode` | both | `sum` (received + sent) or `max` (the larger of the two). Match your provider's billing |
