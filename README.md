@@ -84,6 +84,7 @@ go test ./...
 | `stats.state_path` | both | JSON state file, for example `/var/lib/portman/state.json` |
 | `stats.interface` | both | Network interface to count. Find it with `ip -br link` |
 | `stats.timezone` | both | Day and month boundaries, for example `Asia/Tehran`. Use the same value on both servers |
+| `stats.billing_day` | both | Day of the month when this server's cycle resets (1 to 28, default 1). Set it to match that server's provider |
 | `stats.monthly_limit_gb` | both | Monthly limit in GiB. `0` means no limit line |
 | `stats.count_mode` | both | `sum` (received + sent) or `max` (the larger of the two). Match your provider's billing |
 | `stats.sample_interval` | both | How often counters are read, for example `1m` (minimum `10s`) |
@@ -119,6 +120,7 @@ Install these as `/etc/portman/server.json` on the foreign server and `/etc/port
     "state_path": "/var/lib/portman/state.json",
     "interface": "eth0",
     "timezone": "Asia/Tehran",
+    "billing_day": 27,
     "monthly_limit_gb": 0,
     "count_mode": "sum",
     "sample_interval": "1m",
@@ -147,6 +149,7 @@ Install these as `/etc/portman/server.json` on the foreign server and `/etc/port
     "state_path": "/var/lib/portman/state.json",
     "interface": "eth0",
     "timezone": "Asia/Tehran",
+    "billing_day": 27,
     "monthly_limit_gb": 100,
     "count_mode": "sum",
     "sample_interval": "1m"
@@ -169,7 +172,7 @@ Before you start, change these values:
 - `count_mode`: `sum` if your provider bills in + out, `max` if it bills the larger of the two.
 - `bot_token` and `chat_id`: the values from the Bale setup in step 3.5.
 
-Keep the `stats` block in both files, and keep `timezone` the same on both servers. Only the inside server has `notify`. The foreign server refuses to start with `notify` enabled.
+Each server has its own `timezone`, `billing_day`, `monthly_limit_gb`, and `count_mode`. Set them to match that server's provider.
 
 ## Setup
 

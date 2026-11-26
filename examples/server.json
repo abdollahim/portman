@@ -13,6 +13,7 @@
     "state_path": "/var/lib/portman/state.json",
     "interface": "eth0",
     "timezone": "Asia/Tehran",
+    "billing_day": 27,
     "monthly_limit_gb": 0,
     "count_mode": "sum",
     "sample_interval": "1m",

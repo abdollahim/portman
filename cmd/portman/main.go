@@ -122,6 +122,7 @@ func openStats(cfg config.Config) *stats.Store {
 	if err != nil {
 		log.Fatalf("open stats state: %v", err)
 	}
+	store.SetBillingDay(cfg.Stats.BillingDay)
 	return store
 }
 

@@ -115,10 +115,10 @@ func writeSection(b *strings.Builder, p Payload) {
 
 	used := s.Month.Billable(p.CountMode)
 	if p.LimitGB > 0 {
-		fmt.Fprintf(b, "  Month to date: %s of %.0f GB (%.1f%%)\n",
-			HumanBytes(used), p.LimitGB, float64(used)/(p.LimitGB*gib)*100)
+		fmt.Fprintf(b, "  Cycle to date (since %s): %s of %.0f GB (%.1f%%)\n",
+			s.CycleStart, HumanBytes(used), p.LimitGB, float64(used)/(p.LimitGB*gib)*100)
 	} else {
-		fmt.Fprintf(b, "  Month to date: %s (no limit set)\n", HumanBytes(used))
+		fmt.Fprintf(b, "  Cycle to date (since %s): %s (no limit set)\n", s.CycleStart, HumanBytes(used))
 	}
 }
 

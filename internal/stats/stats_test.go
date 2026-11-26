@@ -144,3 +144,47 @@ func TestParseNetDev(t *testing.T) {
 		t.Fatal("expected an error for a missing interface")
 	}
 }
+
+func on(m time.Month, day, hour, minute int) time.Time {
+	return time.Date(2026, m, day, hour, minute, 0, 0, zone)
+}
+
+func TestCycleStart(t *testing.T) {
+	cases := []struct {
+		now  time.Time
+		day  int
+		want string
+	}{
+		{on(time.November, 5, 12, 0), 27, "2026-10-27"},
+		{on(time.November, 27, 0, 1), 27, "2026-11-27"},
+		{on(time.November, 30, 12, 0), 27, "2026-11-27"},
+		{on(time.November, 1, 12, 0), 1, "2026-11-01"},
+	}
+	for _, c := range cases {
+		if got := CycleStart(c.now, c.day, zone); got != c.want {
+			t.Fatalf("CycleStart(%v, %d) = %q, want %q", c.now, c.day, got, c.want)
+		}
+	}
+}
+
+func TestCycleExcludesPreviousCycle(t *testing.T) {
+	var rx, tx uint64
+	s := openFake(t, &rx, &tx)
+	s.SetBillingDay(27)
+
+	s.Sample(on(time.October, 26, 10, 0))
+	rx = 100
+	s.Sample(on(time.October, 26, 10, 1))
+	rx = 300
+	s.Sample(on(time.October, 28, 10, 0))
+	rx = 600
+	s.Sample(on(time.November, 28, 10, 0))
+
+	snap := s.Snapshot(on(time.November, 28, 11, 0))
+	if snap.CycleStart != "2026-11-27" {
+		t.Fatalf("cycle start = %q, want 2026-11-27", snap.CycleStart)
+	}
+	if snap.Month.NICRx != 300 {
+		t.Fatalf("cycle total = %d, want 300 (only 28 Nov)", snap.Month.NICRx)
+	}
+}

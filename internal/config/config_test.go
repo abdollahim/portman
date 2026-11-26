@@ -230,3 +230,22 @@ func TestServerStatsRequiresClientCA(t *testing.T) {
 		t.Fatal("notify must be refused on the server")
 	}
 }
+
+func TestBillingDayValidation(t *testing.T) {
+	base := Config{
+		Mode: "client", ListenAddr: "127.0.0.1:20001", LogPath: "x.log", RemoteAddr: "h:4443",
+		Stats: Stats{Enabled: true, Label: "inside", StatePath: "s.json", Interface: "eth0"},
+	}
+	cases := []struct {
+		day     int
+		wantErr bool
+	}{{0, false}, {1, false}, {28, false}, {29, true}, {-1, true}}
+
+	for _, tc := range cases {
+		cfg := base
+		cfg.Stats.BillingDay = tc.day
+		if err := cfg.Validate(); (err != nil) != tc.wantErr {
+			t.Fatalf("billing_day %d: error = %v, wantErr %v", tc.day, err, tc.wantErr)
+		}
+	}
+}

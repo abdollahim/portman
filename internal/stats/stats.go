@@ -66,11 +66,12 @@ func (d Day) Billable(mode string) int64 {
 
 // Snapshot holds what a report needs: today, yesterday, and month to date.
 type Snapshot struct {
-	Date      string `json:"date"`
-	Interface string `json:"interface"`
-	Today     Day    `json:"today"`
-	Yesterday Day    `json:"yesterday"`
-	Month     Day    `json:"month"`
+	Date       string `json:"date"`
+	Interface  string `json:"interface"`
+	CycleStart string `json:"cycle_start"`
+	Today      Day    `json:"today"`
+	Yesterday  Day    `json:"yesterday"`
+	Month      Day    `json:"month"`
 }
 
 type state struct {
@@ -83,19 +84,20 @@ type state struct {
 
 // Store is safe for concurrent use.
 type Store struct {
-	mu    sync.Mutex
-	path  string
-	iface string
-	loc   *time.Location
-	st    state
-	dirty bool
-	read  func(iface string) (rx, tx uint64, err error)
+	mu         sync.Mutex
+	path       string
+	iface      string
+	loc        *time.Location
+	billingDay int
+	st         state
+	dirty      bool
+	read       func(iface string) (rx, tx uint64, err error)
 }
 
 // Open loads the state file, or starts empty if there is none. An unreadable
 // file is moved aside, so the service still starts.
 func Open(path, iface string, loc *time.Location) (*Store, error) {
-	s := &Store{path: path, iface: iface, loc: loc, read: readProcNetDev}
+	s := &Store{path: path, iface: iface, loc: loc, read: readProcNetDev, billingDay: 1}
 	s.st.Days = map[string]*Day{}
 
 	data, err := os.ReadFile(path)
@@ -225,16 +227,17 @@ func (s *Store) prune() {
 	}
 }
 
-// Snapshot returns today's, yesterday's, and month-to-date totals as of now.
+// Snapshot returns today's, yesterday's, and current-cycle totals as of now.
+// Month holds the billing cycle totals, which start on the billing day.
 func (s *Store) Snapshot(now time.Time) Snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	today := s.key(now)
 	yesterday := s.key(now.AddDate(0, 0, -1))
-	month := today[:7]
+	cycle := CycleStart(now, s.billingDay, s.loc)
 
-	snap := Snapshot{Date: today, Interface: s.iface}
+	snap := Snapshot{Date: today, Interface: s.iface, CycleStart: cycle}
 	if d := s.st.Days[today]; d != nil {
 		snap.Today = *d
 	}
@@ -242,7 +245,7 @@ func (s *Store) Snapshot(now time.Time) Snapshot {
 		snap.Yesterday = *d
 	}
 	for k, d := range s.st.Days {
-		if strings.HasPrefix(k, month) {
+		if k >= cycle && k <= today {
 			snap.Month.add(*d)
 		}
 	}
@@ -279,4 +282,28 @@ func readProcNetDev(iface string) (uint64, uint64, error) {
 		return 0, 0, fmt.Errorf("read /proc/net/dev (Linux only): %w", err)
 	}
 	return parseNetDev(data, iface)
+}
+
+// SetBillingDay sets the day of the month when a new billing cycle starts (1 to 28).
+// Zero or an out-of-range value falls back to 1.
+func (s *Store) SetBillingDay(day int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if day < 1 || day > 28 {
+		day = 1
+	}
+	s.billingDay = day
+}
+
+// CycleStart returns the first date of the billing cycle that contains now,
+// formatted as "2006-01-02" in loc.
+func CycleStart(now time.Time, billingDay int, loc *time.Location) string {
+	if billingDay < 1 {
+		billingDay = 1
+	}
+	y, m, d := now.In(loc).Date()
+	if d < billingDay {
+		m-- // time.Date normalizes month 0 to December of the previous year
+	}
+	return time.Date(y, m, billingDay, 0, 0, 0, 0, loc).Format("2006-01-02")
 }

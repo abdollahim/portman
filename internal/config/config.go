@@ -36,6 +36,7 @@ type Stats struct {
 	StatePath      string  `json:"state_path,omitempty"`
 	Interface      string  `json:"interface,omitempty"`
 	Timezone       string  `json:"timezone,omitempty"`
+	BillingDay     int     `json:"billing_day,omitempty"`
 	MonthlyLimitGB float64 `json:"monthly_limit_gb,omitempty"`
 	CountMode      string  `json:"count_mode,omitempty"`
 	SampleInterval string  `json:"sample_interval,omitempty"`
@@ -231,6 +232,9 @@ func (s Stats) validate(server bool, clientCA string) error {
 		if clientCA == "" {
 			return errors.New("stats.listen_addr needs client_ca_file, so the stats endpoint requires a client certificate")
 		}
+	}
+	if s.BillingDay != 0 && (s.BillingDay < 1 || s.BillingDay > 28) {
+		return errors.New("stats.billing_day must be between 1 and 28")
 	}
 	return nil
 }

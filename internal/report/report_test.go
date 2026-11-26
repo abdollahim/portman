@@ -44,7 +44,7 @@ func TestBuildMessageShowsBothSides(t *testing.T) {
 	local := Payload{Label: "inside", LimitGB: 50, CountMode: "sum", Snapshot: stats.Snapshot{Interface: "eth0"}}
 
 	msg := BuildMessage("2026-11-24", "Asia/Tehran", local, nil, errors.New("timeout"))
-	for _, want := range []string{"[inside]", "not reachable: timeout", "Month to date"} {
+	for _, want := range []string{"[inside]", "not reachable: timeout", "Cycle to date"} {
 		if !strings.Contains(msg, want) {
 			t.Fatalf("message missing %q:\n%s", want, msg)
 		}
