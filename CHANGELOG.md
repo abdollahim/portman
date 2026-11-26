@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-26
+
 ### Changed
 - Documentation: `timezone`, `billing_day`, `monthly_limit_gb`, and `count_mode` are set per server to match that server's provider.
 
