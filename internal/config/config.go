@@ -233,8 +233,8 @@ func (s Stats) validate(server bool, clientCA string) error {
 			return errors.New("stats.listen_addr needs client_ca_file, so the stats endpoint requires a client certificate")
 		}
 	}
-	if s.BillingDay != 0 && (s.BillingDay < 1 || s.BillingDay > 28) {
-		return errors.New("stats.billing_day must be between 1 and 28")
+	if s.BillingDay != 0 && (s.BillingDay < 1 || s.BillingDay > 31) {
+		return errors.New("stats.billing_day must be between 1 and 31")
 	}
 	return nil
 }

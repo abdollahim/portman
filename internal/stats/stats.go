@@ -284,26 +284,47 @@ func readProcNetDev(iface string) (uint64, uint64, error) {
 	return parseNetDev(data, iface)
 }
 
-// SetBillingDay sets the day of the month when a new billing cycle starts (1 to 28).
+// SetBillingDay sets the day of the month when a new billing cycle starts (1 to 31).
 // Zero or an out-of-range value falls back to 1.
 func (s *Store) SetBillingDay(day int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if day < 1 || day > 28 {
+	if day < 1 || day > 31 {
 		day = 1
 	}
 	s.billingDay = day
 }
 
 // CycleStart returns the first date of the billing cycle that contains now,
-// formatted as "2006-01-02" in loc.
+// formatted as "2006-01-02" in loc. A billing day past the end of a month
+// (for example 31 in February) starts the cycle on the month's last day.
 func CycleStart(now time.Time, billingDay int, loc *time.Location) string {
 	if billingDay < 1 {
 		billingDay = 1
 	}
-	y, m, d := now.In(loc).Date()
-	if d < billingDay {
-		m-- // time.Date normalizes month 0 to December of the previous year
+	if billingDay > 31 {
+		billingDay = 31
 	}
-	return time.Date(y, m, billingDay, 0, 0, 0, 0, loc).Format("2006-01-02")
+	local := now.In(loc)
+	y, m, _ := local.Date()
+	first := time.Date(y, m, 1, 0, 0, 0, 0, loc)
+
+	start := cycleDay(first, billingDay, loc)
+	if local.Before(start) {
+		first = first.AddDate(0, -1, 0)
+		start = cycleDay(first, billingDay, loc)
+	}
+	return start.Format("2006-01-02")
+}
+
+// cycleDay returns billingDay in the month of firstOfMonth, or that month's
+// last day when the month is shorter.
+func cycleDay(firstOfMonth time.Time, billingDay int, loc *time.Location) time.Time {
+	y, m, _ := firstOfMonth.Date()
+	last := firstOfMonth.AddDate(0, 1, -1).Day()
+	d := billingDay
+	if d > last {
+		d = last
+	}
+	return time.Date(y, m, d, 0, 0, 0, 0, loc)
 }

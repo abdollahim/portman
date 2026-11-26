@@ -188,3 +188,23 @@ func TestCycleExcludesPreviousCycle(t *testing.T) {
 		t.Fatalf("cycle total = %d, want 300 (only 28 Nov)", snap.Month.NICRx)
 	}
 }
+
+func TestCycleStartClampsToShortMonths(t *testing.T) {
+	cases := []struct {
+		now  time.Time
+		day  int
+		want string
+	}{
+		{on(time.February, 28, 9, 0), 31, "2026-02-28"}, // February has 28 days
+		{on(time.February, 27, 9, 0), 31, "2026-01-31"}, // before February's reset
+		{on(time.March, 1, 9, 0), 31, "2026-02-28"},
+		{on(time.March, 31, 9, 0), 31, "2026-03-31"},
+		{on(time.April, 29, 9, 0), 30, "2026-03-30"},
+		{on(time.April, 30, 9, 0), 30, "2026-04-30"},
+	}
+	for _, c := range cases {
+		if got := CycleStart(c.now, c.day, zone); got != c.want {
+			t.Fatalf("CycleStart(%v, %d) = %q, want %q", c.now, c.day, got, c.want)
+		}
+	}
+}

@@ -239,7 +239,7 @@ func TestBillingDayValidation(t *testing.T) {
 	cases := []struct {
 		day     int
 		wantErr bool
-	}{{0, false}, {1, false}, {28, false}, {29, true}, {-1, true}}
+	}{{0, false}, {1, false}, {28, false}, {31, false}, {32, true}, {-1, true}}
 
 	for _, tc := range cases {
 		cfg := base
