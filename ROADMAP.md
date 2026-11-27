@@ -16,7 +16,21 @@ This file lists planned work. Each item becomes a release when it's finished, te
 
 ## Next
 
-### 0.7.0: Per-category accounting
+### 0.7.0: Connectivity checks and scheduled report
+
+Problem: reachability checks run from a shell script on cron, separate from Portman. The script's DNS test only confirmed that a packet could be written to port 53, not that a resolver answered. Each change to the address list also means editing the script on the server.
+
+Planned:
+- A `checks` section in the inside server's config: `enabled`, `send_days` (for example `["friday"]`), `send_at` (`HH:MM`), `timezone`, and `targets_file`.
+- Targets in a JSON file, grouped by name, validated when loaded and read again on every run, so edits take effect without a restart.
+- Each address gets one ping and one real DNS query over UDP. Status is `OK` when both answer, `PARTIAL` when one does, and `DOWN` when neither does.
+- The report goes through the same bot as the traffic report. `notify.provider` selects Bale or Telegram.
+- `-checks-now` runs one check, sends it, and exits.
+- The client unit grants `CAP_NET_RAW` as an ambient capability, so `ping` works under `NoNewPrivileges`.
+
+The README's "byte pipe" description stays true in this version, because Portman still doesn't read any protocol bytes.
+
+### 0.8.0: Per-category accounting
 
 Problem: the report shows totals for the whole bridge, not for each device or group.
 
@@ -27,16 +41,16 @@ Planned:
 - The report shows per-category totals for the day and the billing cycle, on each server that counts them.
 - Tests: header parsing, unknown UUID handling, and a check that logs contain labels, not UUIDs.
 
-This is the first version where Portman reads a protocol header, so the README's "byte pipe" description needs to say so.
+This is the first version where Portman reads a protocol header, so the README's "byte pipe" description will need to change.
 
-### 0.8.0: Release trust and operations
+### 0.9.0: Release trust and operations
 
 Planned:
 - Signed release files (for example with `cosign` or `minisign`), with verification steps in the README.
 - A `-check-config` flag that validates a config and reports problems without starting the service.
 - Clearer startup messages for the most common mistakes (wrong port, certificate name mismatch, unreadable key).
 
-### 0.9.0: Connection reuse
+### 0.10.0: Connection reuse
 
 Problem: each local connection pays a new TLS handshake, which adds about 250 ms on a long link.
 
