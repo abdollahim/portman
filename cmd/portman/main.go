@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"portman/internal/checks"
 	"portman/internal/config"
 	"portman/internal/logging"
 	"portman/internal/report"
@@ -28,7 +29,8 @@ var (
 func main() {
 	configPath := flag.String("config", "config.json", "path to config file")
 	showVersion := flag.Bool("version", false, "print version and exit")
-	reportNow := flag.Bool("report-now", false, "send one daily report now and exit (inside server)")
+	reportNow := flag.Bool("report-now", false, "send one traffic report now and exit (inside server)")
+	checksNow := flag.Bool("checks-now", false, "run the connectivity check now, send it, and exit (inside server)")
 	flag.Parse()
 
 	if *showVersion {
@@ -69,7 +71,7 @@ func main() {
 		runServer(cfg)
 		return
 	}
-	runClient(cfg, *reportNow)
+	runClient(cfg, *reportNow, *checksNow)
 }
 
 func runServer(cfg config.Config) {
@@ -84,7 +86,7 @@ func runServer(cfg config.Config) {
 	tunnel.RunServer(cfg)
 }
 
-func runClient(cfg config.Config, reportNow bool) {
+func runClient(cfg config.Config, reportNow, checksNow bool) {
 	store := openStats(cfg)
 
 	if reportNow {
@@ -99,12 +101,27 @@ func runClient(cfg config.Config, reportNow bool) {
 		return
 	}
 
+	if checksNow {
+		if !cfg.Checks.Enabled {
+			fmt.Fprintln(os.Stderr, "-checks-now needs checks.enabled in the config")
+			os.Exit(1)
+		}
+		if err := checks.RunOnce(cfg, time.Now()); err != nil {
+			logging.Logf("error", "connectivity check failed: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if store != nil {
 		tunnel.SetRecorder(store)
 		go sampleLoop(cfg, store)
 	}
 	if cfg.Notify.Enabled {
 		go report.RunDaily(cfg, store)
+	}
+	if cfg.Checks.Enabled {
+		go checks.RunScheduled(cfg)
 	}
 	go tunnel.StartupChecks(cfg)
 	tunnel.RunClient(cfg)

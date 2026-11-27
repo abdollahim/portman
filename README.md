@@ -36,6 +36,38 @@ phone -> inside 3X-UI -> portman client (127.0.0.1:20001)
 | TLS identity | `client.pem` and `client.key` | Let's Encrypt certificate, and `ca.pem` to verify clients |
 | Extra work | Daily report to Bale | Counts its own traffic and serves it |
 
+## Connectivity checks
+
+The inside server can check a list of IP addresses on a schedule and send the result to the same bot as the traffic report. For each address it sends one ping and one DNS query over UDP. The status is `OK` when both answer, `PARTIAL` when one does, and `DOWN` when neither does.
+
+Targets live in a JSON file that is read on every run, so you can change the list without restarting:
+
+```json
+{
+  "groups": [
+    { "name": "Global", "targets": ["1.1.1.1", "8.8.8.8"] },
+    { "name": "Operators", "targets": ["185.55.226.26"] }
+  ]
+}
+```
+
+Each group becomes a section of the report. Addresses must be valid IPv4 or IPv6 addresses.
+
+Setup on the inside server:
+
+```bash
+sudo install -o root -g portman -m 0640 targets.json /etc/portman/targets.json
+sudo python3 -m json.tool /etc/portman/targets.json > /dev/null && echo "targets JSON OK"
+```
+
+Run one check now:
+
+```bash
+cd / && sudo -u portman /usr/local/bin/portman -config /etc/portman/client.json -checks-now; echo "exit=$?"
+```
+
+Requirements: the `ping` command must be installed, and the client unit must grant `CAP_NET_RAW`.
+
 Both servers run the same binary, `/usr/local/bin/portman`, as the unprivileged `portman` user and group.
 
 | Port | Server | Purpose | Allow from |
@@ -95,6 +127,12 @@ go test ./...
 | `notify.chat_id` | client | Chat to send to. Quote it, even if it's a number |
 | `notify.send_at` | client | Send time, `HH:MM`, in `stats.timezone` |
 | `notify.foreign_stats_addr` | client | Foreign stats endpoint, for example `bridge.example.com:8444` |
+| `notify.provider` | client | `bale` (default) or `telegram`. Sets the default bot API host. Both use the same message API |
+| `checks.enabled` | client | Run connectivity checks and send the result on the scheduled days |
+| `checks.send_days` | client | Days to send, in English, for example `["friday"]` |
+| `checks.send_at` | client | Time to send, `HH:MM`, in `checks.timezone` |
+| `checks.timezone` | client | Time zone for the schedule, for example `Asia/Tehran`. Default `UTC` |
+| `checks.targets_file` | client | JSON file with the groups and IP addresses to check |
 
 ## Example configuration
 

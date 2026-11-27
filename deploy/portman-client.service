@@ -17,6 +17,8 @@ LogsDirectory=portman
 LogsDirectoryMode=0750
 
 NoNewPrivileges=true
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true

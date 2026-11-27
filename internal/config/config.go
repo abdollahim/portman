@@ -27,6 +27,7 @@ type Config struct {
 	LogPath        string `json:"log_path"`
 	Stats          Stats  `json:"stats"`
 	Notify         Notify `json:"notify"`
+	Checks         Checks `json:"checks"`
 }
 
 // Stats controls traffic counting. Either server can enable it.
@@ -43,14 +44,25 @@ type Stats struct {
 	ListenAddr     string  `json:"listen_addr,omitempty"`
 }
 
-// Notify controls the daily report. It runs on the inside (client) server only.
+// Notify controls the daily traffic report. It runs on the inside (client) server only.
 type Notify struct {
 	Enabled          bool   `json:"enabled"`
+	Provider         string `json:"provider,omitempty"`
 	APIBase          string `json:"api_base,omitempty"`
 	BotToken         string `json:"bot_token,omitempty"`
 	ChatID           string `json:"chat_id,omitempty"`
 	SendAt           string `json:"send_at,omitempty"`
 	ForeignStatsAddr string `json:"foreign_stats_addr,omitempty"`
+}
+
+// Checks runs connectivity probes from the inside (client) server and sends the result.
+// The bot settings come from the notify section.
+type Checks struct {
+	Enabled     bool     `json:"enabled"`
+	SendDays    []string `json:"send_days,omitempty"`
+	SendAt      string   `json:"send_at,omitempty"`
+	Timezone    string   `json:"timezone,omitempty"`
+	TargetsFile string   `json:"targets_file,omitempty"`
 }
 
 const (
@@ -59,7 +71,18 @@ const (
 	defaultSampleEvery    = time.Minute
 	minSampleEvery        = 10 * time.Second
 	defaultBaleAPI        = "https://tapi.bale.ai"
+	defaultTelegramAPI    = "https://api.telegram.org"
 )
+
+var weekdayNames = map[string]time.Weekday{
+	"sunday":    time.Sunday,
+	"monday":    time.Monday,
+	"tuesday":   time.Tuesday,
+	"wednesday": time.Wednesday,
+	"thursday":  time.Thursday,
+	"friday":    time.Friday,
+	"saturday":  time.Saturday,
+}
 
 // MaxConn returns the connection limit, using the default when unset.
 func (c Config) MaxConn() int {
@@ -104,19 +127,55 @@ func (s Stats) Mode() string {
 	return "sum"
 }
 
-// BaleBase returns the Bale API base URL without a trailing slash.
+// BaleBase returns the bot API base URL without a trailing slash. api_base overrides
+// the default; otherwise the provider picks the host. Telegram and Bale share the
+// same sendMessage API, so the same sender works for both.
 func (n Notify) BaleBase() string {
-	if n.APIBase == "" {
-		return defaultBaleAPI
+	if n.APIBase != "" {
+		return strings.TrimRight(n.APIBase, "/")
 	}
-	return strings.TrimRight(n.APIBase, "/")
+	if n.Provider == "telegram" {
+		return defaultTelegramAPI
+	}
+	return defaultBaleAPI
 }
 
-// Clock returns the send time as hour and minute.
+// Clock returns the traffic report send time as hour and minute.
 func (n Notify) Clock() (int, int, error) {
-	t, err := time.Parse("15:04", n.SendAt)
+	return parseClock(n.SendAt, "notify.send_at")
+}
+
+// ClockAt returns the connectivity check send time as hour and minute.
+func (c Checks) ClockAt() (int, int, error) {
+	return parseClock(c.SendAt, "checks.send_at")
+}
+
+// Weekdays returns the connectivity check send days as time.Weekday values.
+func (c Checks) Weekdays() ([]time.Weekday, error) {
+	var out []time.Weekday
+	for _, name := range c.SendDays {
+		wd, ok := weekdayNames[strings.ToLower(strings.TrimSpace(name))]
+		if !ok {
+			return nil, fmt.Errorf("checks.send_days: unknown day %q (use English names such as \"friday\")", name)
+		}
+		out = append(out, wd)
+	}
+	return out, nil
+}
+
+// Location returns the timezone for the connectivity check schedule (default UTC).
+func (c Checks) Location() (*time.Location, error) {
+	name := c.Timezone
+	if name == "" {
+		name = "UTC"
+	}
+	return time.LoadLocation(name)
+}
+
+func parseClock(value, field string) (int, int, error) {
+	t, err := time.Parse("15:04", value)
 	if err != nil {
-		return 0, 0, errors.New("notify.send_at must be HH:MM, for example 23:55")
+		return 0, 0, fmt.Errorf("%s must be HH:MM, for example 07:00", field)
 	}
 	return t.Hour(), t.Minute(), nil
 }
@@ -173,6 +232,9 @@ func (c Config) Validate() error {
 		if c.ClientCertFile != "" || c.ClientKeyFile != "" {
 			return errors.New("client_cert_file and client_key_file are for client mode only")
 		}
+		if c.Checks.Enabled {
+			return errors.New("checks run on the inside (client) server only")
+		}
 		if c.Notify.Enabled {
 			return errors.New("notify is for the inside (client) server only")
 		}
@@ -191,7 +253,10 @@ func (c Config) Validate() error {
 	if err := c.Stats.validate(false, ""); err != nil {
 		return err
 	}
-	return c.Notify.validate(c.Stats, c.ClientCertFile, c.ClientKeyFile, c.ServerName)
+	if err := c.Notify.validate(c.Stats, c.ClientCertFile, c.ClientKeyFile, c.ServerName); err != nil {
+		return err
+	}
+	return c.Checks.validate(c.Notify)
 }
 
 func (s Stats) validate(server bool, clientCA string) error {
@@ -219,6 +284,9 @@ func (s Stats) validate(server bool, clientCA string) error {
 	if s.MonthlyLimitGB < 0 {
 		return errors.New("stats.monthly_limit_gb cannot be negative")
 	}
+	if s.BillingDay != 0 && (s.BillingDay < 1 || s.BillingDay > 31) {
+		return errors.New("stats.billing_day must be between 1 and 31")
+	}
 	if s.SampleInterval != "" {
 		d, err := time.ParseDuration(s.SampleInterval)
 		if err != nil || d < minSampleEvery {
@@ -233,8 +301,24 @@ func (s Stats) validate(server bool, clientCA string) error {
 			return errors.New("stats.listen_addr needs client_ca_file, so the stats endpoint requires a client certificate")
 		}
 	}
-	if s.BillingDay != 0 && (s.BillingDay < 1 || s.BillingDay > 31) {
-		return errors.New("stats.billing_day must be between 1 and 31")
+	return nil
+}
+
+// validateSender checks the bot settings shared by the traffic report and the checks.
+func (n Notify) validateSender() error {
+	if n.BotToken == "" {
+		return errors.New("notify.bot_token is required")
+	}
+	if n.ChatID == "" {
+		return errors.New("notify.chat_id is required")
+	}
+	switch n.Provider {
+	case "", "bale", "telegram":
+	default:
+		return errors.New(`notify.provider must be "bale" or "telegram"`)
+	}
+	if n.APIBase != "" && !strings.HasPrefix(n.APIBase, "https://") && !strings.HasPrefix(n.APIBase, "http://") {
+		return errors.New("notify.api_base must start with https://")
 	}
 	return nil
 }
@@ -246,17 +330,11 @@ func (n Notify) validate(s Stats, certFile, keyFile, serverName string) error {
 	if !s.Enabled {
 		return errors.New("notify needs stats.enabled = true, because the report uses the counters")
 	}
-	if n.BotToken == "" {
-		return errors.New("notify.bot_token is required")
-	}
-	if n.ChatID == "" {
-		return errors.New("notify.chat_id is required")
+	if err := n.validateSender(); err != nil {
+		return err
 	}
 	if _, _, err := n.Clock(); err != nil {
 		return err
-	}
-	if n.APIBase != "" && !strings.HasPrefix(n.APIBase, "https://") && !strings.HasPrefix(n.APIBase, "http://") {
-		return errors.New("notify.api_base must start with https://")
 	}
 	if n.ForeignStatsAddr != "" {
 		if certFile == "" || keyFile == "" {
@@ -265,6 +343,32 @@ func (n Notify) validate(s Stats, certFile, keyFile, serverName string) error {
 		if serverName == "" {
 			return errors.New("notify.foreign_stats_addr needs server_name")
 		}
+	}
+	return nil
+}
+
+func (c Checks) validate(n Notify) error {
+	if !c.Enabled {
+		return nil
+	}
+	days, err := c.Weekdays()
+	if err != nil {
+		return err
+	}
+	if len(days) == 0 {
+		return errors.New(`checks.send_days needs at least one day, such as ["friday"]`)
+	}
+	if _, _, err := c.ClockAt(); err != nil {
+		return err
+	}
+	if _, err := c.Location(); err != nil {
+		return fmt.Errorf("checks.timezone: %w", err)
+	}
+	if c.TargetsFile == "" {
+		return errors.New("checks.targets_file is required")
+	}
+	if err := n.validateSender(); err != nil {
+		return fmt.Errorf("checks send through the bot in notify: %w", err)
 	}
 	return nil
 }

@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Connectivity checks on the inside server: the `checks` config section sets the days, time, time zone, and targets file. Each address gets one ping and one DNS query over UDP. The report shows `OK`, `PARTIAL`, or `DOWN` per address.
+- `-checks-now` runs one check, sends it, and exits.
+- `notify.provider` (`bale` or `telegram`) selects the default bot API host.
+- Targets file in JSON, grouped by name, validated when it is loaded and read on every run.
+
+### Changed
+- Client unit grants `CAP_NET_RAW` as an ambient capability, so `ping` works under `NoNewPrivileges`.
+
 ## [0.6.2] - 2026-11-26
 
 ### Added

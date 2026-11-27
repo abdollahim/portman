@@ -249,3 +249,46 @@ func TestBillingDayValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestChecksValidation(t *testing.T) {
+	base := Config{
+		Mode: "client", ListenAddr: "127.0.0.1:20001", LogPath: "x.log", RemoteAddr: "h:4443",
+		ClientCertFile: "c.pem", ClientKeyFile: "k.pem",
+		Notify: Notify{BotToken: "123456:TOKEN", ChatID: "1"},
+		Checks: Checks{Enabled: true, SendDays: []string{"friday"}, SendAt: "07:00", TargetsFile: "t.json"},
+	}
+	server := Config{
+		Mode: "server", ListenAddr: ":4443", LogPath: "x.log",
+		CertFile: "c.pem", KeyFile: "k.pem", BackendAddr: "127.0.0.1:10000",
+		Checks: Checks{Enabled: true, SendDays: []string{"friday"}, SendAt: "07:00", TargetsFile: "t.json"},
+	}
+
+	cases := []struct {
+		name    string
+		cfg     Config
+		edit    func(*Config)
+		wantErr bool
+	}{
+		{"valid", base, func(*Config) {}, false},
+		{"no days", base, func(c *Config) { c.Checks.SendDays = nil }, true},
+		{"unknown day", base, func(c *Config) { c.Checks.SendDays = []string{"funday"} }, true},
+		{"bad time", base, func(c *Config) { c.Checks.SendAt = "7am" }, true},
+		{"no targets file", base, func(c *Config) { c.Checks.TargetsFile = "" }, true},
+		{"bad timezone", base, func(c *Config) { c.Checks.Timezone = "Mars/Base" }, true},
+		{"no bot token", base, func(c *Config) { c.Notify.BotToken = "" }, true},
+		{"telegram provider", base, func(c *Config) { c.Notify.Provider = "telegram" }, false},
+		{"unknown provider", base, func(c *Config) { c.Notify.Provider = "signal" }, true},
+		{"disabled ignores bad fields", base, func(c *Config) { c.Checks.Enabled = false; c.Checks.SendAt = "bad" }, false},
+		{"server refuses checks", server, func(*Config) {}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := tc.cfg
+			tc.edit(&cfg)
+			err := cfg.Validate()
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Validate() error = %v, wantErr %v", err, tc.wantErr)
+			}
+		})
+	}
+}
