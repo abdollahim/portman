@@ -26,15 +26,21 @@ var (
 	date    = "unknown"
 )
 
+// versionString returns the build identity printed by -v and -version.
+func versionString() string {
+	return fmt.Sprintf("portman %s (commit %s, built %s)", version, commit, date)
+}
+
 func main() {
 	configPath := flag.String("config", "config.json", "path to config file")
 	showVersion := flag.Bool("version", false, "print version and exit")
+	showVersionShort := flag.Bool("v", false, "print version and exit (same as -version)")
 	reportNow := flag.Bool("report-now", false, "send one traffic report now and exit (inside server)")
 	checksNow := flag.Bool("checks-now", false, "run the connectivity check now, send it, and exit (inside server)")
 	flag.Parse()
 
-	if *showVersion {
-		fmt.Printf("portman %s (commit %s, built %s)\n", version, commit, date)
+	if *showVersion || *showVersionShort {
+		fmt.Println(versionString())
 		return
 	}
 

@@ -15,6 +15,7 @@ Releases use [Semantic Versioning](https://semver.org/) and are tagged `vX.Y.Z`.
 Check the installed build:
 
 ```bash
+/usr/local/bin/portman -v
 /usr/local/bin/portman -version
 ```
 
