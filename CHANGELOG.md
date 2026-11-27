@@ -7,11 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.6.2] - 2026-11-26
 
-### Changed
-- Documentation: `timezone`, `billing_day`, `monthly_limit_gb`, and `count_mode` are set per server to match that server's provider.
-
 ### Added
 - Test confirming that each server keeps its own billing cycle.
+
+### Changed
+- Documentation: `timezone`, `billing_day`, `monthly_limit_gb`, and `count_mode` are set per server to match that server's provider.
 
 ## [0.6.0] - 2026-11-26
 
