@@ -13,22 +13,9 @@ This file lists planned work. Each item becomes a release when it's finished, te
 - **0.6.0**: Billing cycle reset day (`stats.billing_day`, 1 to 28), so monthly totals start on the provider's reset day.
 - **0.6.1**: `billing_day` accepts 1 to 31. In shorter months, the cycle starts on the last day.
 - **0.6.2**: Billing settings documented per server, with a test that each server keeps its own cycle.
+- **0.7.0**: Connectivity checks: scheduled ping and DNS report through the bot, targets in a JSON file, `-checks-now`, `checks` config section.
 
 ## Next
-
-### 0.7.0: Connectivity checks and scheduled report
-
-Problem: reachability checks run from a shell script on cron, separate from Portman. The script's DNS test only confirmed that a packet could be written to port 53, not that a resolver answered. Each change to the address list also means editing the script on the server.
-
-Planned:
-- A `checks` section in the inside server's config: `enabled`, `send_days` (for example `["friday"]`), `send_at` (`HH:MM`), `timezone`, and `targets_file`.
-- Targets in a JSON file, grouped by name, validated when loaded and read again on every run, so edits take effect without a restart.
-- Each address gets one ping and one real DNS query over UDP. Status is `OK` when both answer, `PARTIAL` when one does, and `DOWN` when neither does.
-- The report goes through the same bot as the traffic report. `notify.provider` selects Bale or Telegram.
-- `-checks-now` runs one check, sends it, and exits.
-- The client unit grants `CAP_NET_RAW` as an ambient capability, so `ping` works under `NoNewPrivileges`.
-
-The README's "byte pipe" description stays true in this version, because Portman still doesn't read any protocol bytes.
 
 ### 0.8.0: Per-category accounting
 
@@ -61,6 +48,8 @@ Planned:
 
 ## Later
 
+- Ping-only checks per group, so resolvers that refuse outside DNS queries don't show as `PARTIAL`.
+- A fallback transport for the stats endpoint (over the bridge port or 443 under a path) if a port is blocked on the network.
 - Multiple backends or multiple bridges per client, with failover.
 - Native Windows service support.
 - A Bale or Telegram alert when a server stops reporting.

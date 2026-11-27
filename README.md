@@ -487,7 +487,7 @@ Expected: an error about a certificate being required. A timeout means the firew
 #### 3.1 Install the client certificate and key
 
 ```bash
-sudo install -o root -g root -m 0644 /tmp/client.pem /etc/portman/client.pem
+sudo install -o root -g portman -m 0644 /tmp/client.pem /etc/portman/client.pem
 sudo install -o root -g portman -m 0640 /tmp/client.key /etc/portman/client.key
 ```
 
@@ -519,6 +519,17 @@ Paste the `client.json` block from the Example configuration section, and set `s
 ```bash
 sudo chown root:portman /etc/portman/client.json
 sudo chmod 0640 /etc/portman/client.json
+```
+
+Then move or open the targets file:
+
+```bash
+sudo nano /etc/portman/targets.json
+```
+OR
+
+```bash
+sudo install -o root -g portman -m 0640 /tmp/targets.json /etc/portman/targets.json
 ```
 
 #### 3.3 Check the config
@@ -713,6 +724,34 @@ sudo mv /var/lib/portman/state.json /var/lib/portman/state.json.old
 sudo systemctl start portman-client
 ```
 
+### File permissions
+
+Each file in `/etc/portman` must be readable by the `portman` group, because the service runs as `portman`. Configs and keys hold tokens and private data, so they're `0640`. Public certificates are `0644`.
+
+```bash
+sudo chown root:portman /etc/portman
+sudo chmod 0750 /etc/portman
+
+sudo chown root:portman /etc/portman/client.json /etc/portman/targets.json
+sudo chmod 0640 /etc/portman/client.json /etc/portman/targets.json
+
+sudo chown root:portman /etc/portman/client.key /etc/portman/client.pem
+sudo chmod 0640 /etc/portman/client.key
+sudo chmod 0644 /etc/portman/client.pem
+```
+
+On the server, replace `client.json` and `client.key` with `server.json` and the server key, and omit `targets.json` and `client.pem`.
+
+Check that the service user can read each file:
+
+```bash
+sudo -u portman test -r /etc/portman/client.json && echo "client.json readable"
+sudo -u portman test -r /etc/portman/targets.json && echo "targets readable"
+sudo -u portman test -r /etc/portman/client.key && echo "key readable"
+sudo -u portman test -r /etc/portman/client.pem && echo "cert readable"
+systemctl is-active portman-client
+```
+
 ### Troubleshooting
 
 | Symptom | Check | Fix |
@@ -731,6 +770,18 @@ sudo systemctl start portman-client
 | Bale `chat not found` | `chat_id` | Message the bot, then read `getUpdates` again. |
 | Bridge connects, but nothing passes | Foreign log shows `0 bytes` | The inside outbound's ID doesn't match the foreign inbound client. |
 | Pages are slow | Client log `dial took` | Each new connection pays a handshake. See the roadmap for connection reuse. |
+| `read targets file: permission denied` | `ls -l /etc/portman` and `ls -ld /etc/portman` | Apply the File permissions section. The directory needs `root:portman` with mode `0750`. |
+| Config readable by other users | `ls -l /etc/portman/client.json` | Set mode `0640` (see File permissions). The config holds the bot token. |
+
+### Reading the report
+
+Each address shows one status:
+
+- `OK`: ping and DNS both answered.
+- `PARTIAL`: one of the two answered. Often the host is up, but its resolver refuses queries from outside its network.
+- `DOWN`: neither answered.
+
+The last line counts successes across all addresses: `ping ok: 20/21` means 20 of 21 addresses answered a ping, and `DNS ok: 16/21` means 16 answered the DNS query.
 
 ### Security
 
