@@ -101,6 +101,24 @@ Each address shows one status:
 
 The last line counts successes across all addresses: `ping ok: 20/21` means 20 of 21 addresses answered a ping, and `DNS ok: 16/21` means 16 answered the DNS query.
 
+## Traffic stats and daily report
+
+Each server counts traffic per day in its own timezone and billing cycle, and saves the totals to `stats.state_path`. Every figure in the report falls into one of three groups:
+
+- **Whole server (in + out):** read from the network interface (`/proc/net/dev`). It includes everything: SSH, the panel, OS updates, direct clients, and portman. This is the figure your provider bills, and the one compared against `monthly_limit_gb`.
+- **Portman bridge:** the tunnel's own bytes, in both directions.
+- **Other:** whole server minus portman. This is an estimate. The bridge counts decrypted payload, while the interface also counts TLS overhead.
+
+The inside server (`notify.enabled`) sends the report at `notify.send_at`. Each server gets its own section, and the inside server fetches the foreign server's numbers over mutual TLS from `notify.foreign_stats_addr`.
+
+Send a report now:
+
+```bash
+cd / && sudo -u portman /usr/local/bin/portman -config /etc/portman/client.json -report-now
+```
+
+Limits: sampling runs every `sample_interval`, so an abrupt stop can lose up to one interval of counts. If the inside server is off at `send_at`, that day's report is not sent.
+
 ## Configuration reference
 
 JSON numbers must not have leading zeros. Write `billing_day` as `1`, not `01`.

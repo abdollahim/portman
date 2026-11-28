@@ -118,3 +118,28 @@ func TestBaleGivesUp(t *testing.T) {
 		t.Fatalf("calls = %d, want 2", calls)
 	}
 }
+
+func TestSectionSeparatesPortmanFromOther(t *testing.T) {
+	p := Payload{
+		Label:     "foreign",
+		CountMode: "sum",
+		Snapshot: stats.Snapshot{
+			Interface: "eth0",
+			Month: stats.Day{
+				NICRx: 1000, NICTx: 1000,
+				BridgeUp: 300, BridgeDown: 200, BridgeConns: 4,
+			},
+		},
+	}
+	msg := BuildMessage("2026-11-28", "Asia/Tehran", p, nil, nil)
+	for _, want := range []string{
+		"whole server (in+out): 2.0 KiB",
+		"portman bridge: 500 B",
+		"other (SSH, panel, OS, direct clients): 1.5 KiB",
+		"Cycle to date",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("missing %q in:\n%s", want, msg)
+		}
+	}
+}

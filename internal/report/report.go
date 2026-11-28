@@ -107,19 +107,40 @@ func BuildMessage(date, zone string, local Payload, foreign *Payload, foreignErr
 func writeSection(b *strings.Builder, p Payload) {
 	s := p.Snapshot
 	fmt.Fprintf(b, "[%s] interface %s\n", p.Label, s.Interface)
-	fmt.Fprintf(b, "  Bridge today: %d connections, %s up, %s down\n",
-		s.Today.BridgeConns, HumanBytes(s.Today.BridgeUp), HumanBytes(s.Today.BridgeDown))
-	fmt.Fprintf(b, "  Interface today: %s received, %s sent\n",
-		HumanBytes(s.Today.NICRx), HumanBytes(s.Today.NICTx))
-	fmt.Fprintf(b, "  Interface yesterday (billable): %s\n", HumanBytes(s.Yesterday.Billable(p.CountMode)))
+
+	fmt.Fprintf(b, "  Today:\n")
+	writeBreakdown(b, s.Today)
+
+	fmt.Fprintf(b, "  Yesterday:\n")
+	writeBreakdown(b, s.Yesterday)
 
 	used := s.Month.Billable(p.CountMode)
 	if p.LimitGB > 0 {
-		fmt.Fprintf(b, "  Cycle to date (since %s): %s of %.0f GB (%.1f%%)\n",
+		fmt.Fprintf(b, "  Cycle to date (since %s), whole server billable: %s of %.0f GB (%.1f%%)\n",
 			s.CycleStart, HumanBytes(used), p.LimitGB, float64(used)/(p.LimitGB*gib)*100)
 	} else {
-		fmt.Fprintf(b, "  Cycle to date (since %s): %s (no limit set)\n", s.CycleStart, HumanBytes(used))
+		fmt.Fprintf(b, "  Cycle to date (since %s), whole server billable: %s (no limit set)\n",
+			s.CycleStart, HumanBytes(used))
 	}
+	fmt.Fprintf(b, "  Cycle to date (since %s) breakdown:\n", s.CycleStart)
+	writeBreakdown(b, s.Month)
+}
+
+// writeBreakdown prints whole-server traffic split into portman and everything else.
+// Whole-server figures come from the network interface (in + out). Portman figures
+// are the tunnel's own counts. "Other" is the difference, clamped at zero, so it
+// includes SSH, the panel, OS updates, direct clients, and TLS overhead.
+func writeBreakdown(b *strings.Builder, d stats.Day) {
+	server := d.NICRx + d.NICTx
+	portman := d.BridgeUp + d.BridgeDown
+	other := server - portman
+	if other < 0 {
+		other = 0
+	}
+	fmt.Fprintf(b, "    whole server (in+out): %s  [received %s, sent %s]\n",
+		HumanBytes(server), HumanBytes(d.NICRx), HumanBytes(d.NICTx))
+	fmt.Fprintf(b, "    portman bridge: %s  (%d connections)\n", HumanBytes(portman), d.BridgeConns)
+	fmt.Fprintf(b, "    other (SSH, panel, OS, direct clients): %s\n", HumanBytes(other))
 }
 
 // HumanBytes formats n with binary units, for example 1.5 KiB.

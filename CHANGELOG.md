@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-11-28
+
+### Changed
+- Daily report shows whole-server traffic from the network interface (in + out) as the billing figure, then splits it into portman bridge traffic and other traffic (SSH, panel, OS updates, direct clients). This applies to today, yesterday, and the billing cycle.
+- The cycle limit line states that it is the whole-server billable figure.
+- README: restored the traffic stats section, which was missing from the 0.7.1 README.
+
+### Added
+- Test that the report separates portman traffic from other traffic.
+
 ## [0.7.1] - 2026-11-27
 
 ### Added
