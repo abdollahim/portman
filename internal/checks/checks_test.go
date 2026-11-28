@@ -147,14 +147,14 @@ func TestBuildReport(t *testing.T) {
 	res := []Result{
 		{Group: "Global", IP: "1.1.1.1", PingOK: true, PingRTT: 12 * time.Millisecond, DNSOK: true, DNSRTT: 14 * time.Millisecond},
 		{Group: "Global", IP: "8.8.8.8"},
-		{Group: "Shecan", IP: "178.22.122.100", DNSOK: true, DNSRTT: 30 * time.Millisecond},
+		{Group: "Example", IP: "192.0.2.10", DNSOK: true, DNSRTT: 30 * time.Millisecond},
 	}
 	when := time.Date(2026, time.November, 27, 7, 0, 0, 0, zone)
 	msg := BuildReport("inside", when, "Asia/Tehran", res)
 
 	for _, want := range []string{
-		"connectivity check (inside)", "2026-11-27 07:00", "[Global]", "[Shecan]",
-		"OK", "DOWN", "PARTIAL", "1.1.1.1", "8.8.8.8", "178.22.122.100",
+		"connectivity check (inside)", "2026-11-27 07:00", "[Global]", "[Example]",
+		"OK", "DOWN", "PARTIAL", "1.1.1.1", "8.8.8.8", "192.0.2.10",
 		"ping ok: 1/3, DNS ok: 2/3",
 	} {
 		if !strings.Contains(msg, want) {

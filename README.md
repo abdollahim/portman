@@ -76,7 +76,7 @@ Targets live in a JSON file that is read on every run, so you can change the lis
 {
   "groups": [
     { "name": "Global", "targets": ["1.1.1.1", "8.8.8.8"] },
-    { "name": "Operators", "targets": ["185.55.226.26"] }
+    { "name": "Operators", "targets": ["192.0.2.10"] }
   ]
 }
 ```
