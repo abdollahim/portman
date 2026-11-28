@@ -1,18 +1,18 @@
 # Portman
 
-A small TLS tunnel that forwards TCP traffic between two servers. It offers optional mutual TLS, per-day traffic accounting on both servers, and a daily report sent to a Bale bot.
+A small TLS tunnel that forwards TCP traffic between two servers. It offers optional mutual TLS, per-day traffic accounting on both servers, a daily traffic report, and scheduled connectivity checks, all sent to a Bale or Telegram bot.
 
 Portman does not parse the traffic. It is a byte pipe, so the backend on the far side must accept exactly what the near side sends. For example, a VLESS outbound on the inside server needs a VLESS inbound on the foreign server, with the same client ID.
 
 ## Status
 
-Experimental (v0.5.1). Tested end to end with one inside server and one foreign server carrying real traffic. Not tested with multiple clients or under production load.
+Experimental (v0.7.1). Tested end to end with one inside server and one foreign server carrying real traffic. Not tested with multiple clients or under production load.
 
 ## Versioning
 
 Releases use [Semantic Versioning](https://semver.org/) and are tagged `vX.Y.Z`. Until 1.0.0, a minor version may change configuration or behavior. See [CHANGELOG.md](CHANGELOG.md) for what changed and [ROADMAP.md](ROADMAP.md) for what's planned.
 
-Check the installed build:
+Check the installed build (both flags print the same output):
 
 ```bash
 /usr/local/bin/portman -v
@@ -33,9 +33,38 @@ phone -> inside 3X-UI -> portman client (127.0.0.1:20001)
 | Service | `portman-client` | `portman-server` |
 | Config | `/etc/portman/client.json` | `/etc/portman/server.json` |
 | Listens on | `127.0.0.1:20001` | `:4443` (bridge), `:8444` (stats) |
-| Connects to | `bridge.example.com:4443`, `bridge.example.com:8444`, Bale API | `127.0.0.1:10000` (3X-UI) |
+| Connects to | `bridge.example.com:4443`, `bridge.example.com:8444`, Bale or Telegram API, check targets | `127.0.0.1:10000` (3X-UI) |
 | TLS identity | `client.pem` and `client.key` | Let's Encrypt certificate, and `ca.pem` to verify clients |
-| Extra work | Daily report to Bale | Counts its own traffic and serves it |
+| Extra work | Daily traffic report and scheduled connectivity checks | Counts its own traffic and serves it |
+
+Both servers run the same binary, `/usr/local/bin/portman`, as the unprivileged `portman` user and group.
+
+| Port | Server | Purpose | Allow from |
+|---|---|---|---|
+| 4443/tcp | foreign | Bridge (TLS) | inside server IP only |
+| 8444/tcp | foreign | Traffic counters (mutual TLS) | inside server IP only |
+| 10000/tcp | foreign | 3X-UI bridge inbound | localhost only |
+| 20001/tcp | inside | Local entry from 3X-UI | localhost only |
+| 443/tcp (outbound) | inside | Bot API calls and connectivity check targets | none (outbound) |
+
+## Requirements
+
+- Debian 12 or 13, or Ubuntu 22.04 or newer, on both servers, with systemd and `sudo`.
+- A hostname for the bridge, such as `bridge.example.com`, with a **DNS-only** record pointing to the foreign server. Cloudflare-proxied records don't pass ports 4443 or 8444.
+- A Let's Encrypt certificate for that hostname on the foreign server.
+- 3X-UI on both servers.
+- For the daily report and checks: a bot token and a chat ID (Bale by default, or Telegram).
+- The `ping` command on the inside server.
+- To build from source: Go 1.21 or newer.
+
+## Build and tests
+
+```bash
+go build -o dist/portman ./cmd/portman
+go test ./...
+```
+
+`release.ps1` (Windows PowerShell) runs `go vet`, a format check, and `go test`, then builds Linux and Windows binaries with the version and commit embedded, and writes SHA-256 checksums to `dist/`.
 
 ## Connectivity checks
 
@@ -52,51 +81,29 @@ Targets live in a JSON file that is read on every run, so you can change the lis
 }
 ```
 
-Each group becomes a section of the report. Addresses must be valid IPv4 or IPv6 addresses.
+Each group becomes a section of the report. Addresses must be valid IPv4 or IPv6 addresses. Keep this file with the other configs, and don't commit a private list.
 
-Setup on the inside server:
+The schedule is set in the `checks` section of `client.json`. Days are English names, and `send_at` is `HH:MM` in `checks.timezone`.
 
-```bash
-sudo install -o root -g portman -m 0640 targets.json /etc/portman/targets.json
-sudo python3 -m json.tool /etc/portman/targets.json > /dev/null && echo "targets JSON OK"
-```
-
-Run one check now:
+Run one check now, as the service user:
 
 ```bash
 cd / && sudo -u portman /usr/local/bin/portman -config /etc/portman/client.json -checks-now; echo "exit=$?"
 ```
 
-Requirements: the `ping` command must be installed, and the client unit must grant `CAP_NET_RAW`.
+### Reading the report
 
-Both servers run the same binary, `/usr/local/bin/portman`, as the unprivileged `portman` user and group.
+Each address shows one status:
 
-| Port | Server | Purpose | Allow from |
-|---|---|---|---|
-| 4443/tcp | foreign | Bridge (TLS) | inside server IP only |
-| 8444/tcp | foreign | Traffic counters (mutual TLS) | inside server IP only |
-| 10000/tcp | foreign | 3X-UI bridge inbound | localhost only |
-| 20001/tcp | inside | Local entry from 3X-UI | localhost only |
+- `OK`: ping and DNS both answered.
+- `PARTIAL`: one of the two answered. Often the host is up, but its resolver refuses queries from outside its network.
+- `DOWN`: neither answered.
 
-## Requirements
-
-- Debian 12 or 13, or Ubuntu 22.04 or newer, on both servers, with systemd and `sudo`.
-- A hostname for the bridge, such as `bridge.example.com`, with a **DNS-only** record pointing to the foreign server. Cloudflare-proxied records don't pass ports 4443 or 8444.
-- A Let's Encrypt certificate for that hostname on the foreign server.
-- 3X-UI on both servers.
-- For the daily report: a Bale bot token and a chat ID.
-- To build from source: Go 1.21 or newer.
-
-## Build and tests
-
-```bash
-go build -o dist/portman ./cmd/portman
-go test ./...
-```
-
-`release.ps1` (Windows PowerShell) runs `go vet`, a format check, and `go test`, then builds Linux and Windows binaries with the version and commit embedded, and writes SHA-256 checksums to `dist/`.
+The last line counts successes across all addresses: `ping ok: 20/21` means 20 of 21 addresses answered a ping, and `DNS ok: 16/21` means 16 answered the DNS query.
 
 ## Configuration reference
+
+JSON numbers must not have leading zeros. Write `billing_day` as `1`, not `01`.
 
 | Field | Used by | Description |
 |---|---|---|
@@ -115,20 +122,20 @@ go test ./...
 | `stats.enabled` | both | Count traffic per day and save totals to `stats.state_path` |
 | `stats.label` | both | Name shown in the report |
 | `stats.state_path` | both | JSON state file, for example `/var/lib/portman/state.json` |
-| `stats.interface` | both | Network interface to count. Find it with `ip -br link` |
+| `stats.interface` | both | Network interface to count. Find it with `ip -br addr` |
 | `stats.timezone` | both | Day and month boundaries for this server, for example `Asia/Tehran`. Set it to match that server's provider |
 | `stats.billing_day` | both | Day of the month when this server's cycle resets (1 to 31, default 1). If the month is shorter, the cycle starts on its last day. Set it to match that server's provider |
 | `stats.monthly_limit_gb` | both | Monthly limit in GiB. `0` means no limit line |
 | `stats.count_mode` | both | `sum` (received + sent) or `max` (the larger of the two). Match your provider's billing |
 | `stats.sample_interval` | both | How often counters are read, for example `1m` (minimum `10s`) |
 | `stats.listen_addr` | server | Stats endpoint address, for example `:8444`. Requires `client_ca_file` |
-| `notify.enabled` | client | Send the daily report |
-| `notify.api_base` | client | Bale API base. Default `https://tapi.bale.ai` |
-| `notify.bot_token` | client | Bale bot token |
-| `notify.chat_id` | client | Chat to send to. Quote it, even if it's a number |
-| `notify.send_at` | client | Send time, `HH:MM`, in `stats.timezone` |
-| `notify.foreign_stats_addr` | client | Foreign stats endpoint, for example `bridge.example.com:8444` |
+| `notify.enabled` | client | Send the daily traffic report |
 | `notify.provider` | client | `bale` (default) or `telegram`. Sets the default bot API host. Both use the same message API |
+| `notify.api_base` | client | Bot API base. Default follows `provider` |
+| `notify.bot_token` | client | Bot token |
+| `notify.chat_id` | client | Chat to send to. Quote it, even if it's a number |
+| `notify.send_at` | client | Traffic report send time, `HH:MM`, in `stats.timezone` |
+| `notify.foreign_stats_addr` | client | Foreign stats endpoint, for example `bridge.example.com:8444` |
 | `checks.enabled` | client | Run connectivity checks and send the result on the scheduled days |
 | `checks.send_days` | client | Days to send, in English, for example `["friday"]` |
 | `checks.send_at` | client | Time to send, `HH:MM`, in `checks.timezone` |
@@ -138,6 +145,8 @@ go test ./...
 ## Example configuration
 
 Install these as `/etc/portman/server.json` on the foreign server and `/etc/portman/client.json` on the inside server. They are also in `examples/`.
+
+Replace the placeholders, and set `billing_day`, `timezone`, and `interface` to match each server.
 
 ### server.json (foreign server)
 
@@ -158,8 +167,8 @@ Install these as `/etc/portman/server.json` on the foreign server and `/etc/port
     "label": "foreign",
     "state_path": "/var/lib/portman/state.json",
     "interface": "eth0",
-    "timezone": "Asia/Tehran",
-    "billing_day": 27,
+    "timezone": "Europe/Berlin",
+    "billing_day": 1,
     "monthly_limit_gb": 0,
     "count_mode": "sum",
     "sample_interval": "1m",
@@ -167,6 +176,8 @@ Install these as `/etc/portman/server.json` on the foreign server and `/etc/port
   }
 }
 ```
+
+The foreign server must not contain `notify` or `checks` blocks. It refuses to start with them.
 
 ### client.json (inside server)
 
@@ -188,30 +199,38 @@ Install these as `/etc/portman/server.json` on the foreign server and `/etc/port
     "state_path": "/var/lib/portman/state.json",
     "interface": "eth0",
     "timezone": "Asia/Tehran",
-    "billing_day": 27,
+    "billing_day": 1,
     "monthly_limit_gb": 100,
     "count_mode": "sum",
     "sample_interval": "1m"
   },
   "notify": {
     "enabled": true,
+    "provider": "bale",
     "api_base": "https://tapi.bale.ai",
-    "bot_token": "PASTE_BALE_BOT_TOKEN",
+    "bot_token": "PASTE_BOT_TOKEN",
     "chat_id": "PASTE_CHAT_ID",
     "send_at": "23:55",
     "foreign_stats_addr": "bridge.example.com:8444"
+  },
+  "checks": {
+    "enabled": true,
+    "send_days": ["friday"],
+    "send_at": "07:00",
+    "timezone": "Asia/Tehran",
+    "targets_file": "/etc/portman/targets.json"
   }
 }
 ```
 
 Before you start, change these values:
 
-- `stats.interface`: use the interface that holds the server's public address (`ip -br addr`). Often `eth0`, but it may be `ens3` or `ens160`. Set it separately on each server.
+- `stats.interface`: the interface that holds the server's public address. Find it with `ip -br addr`. Often `eth0`, but it may be `ens3` or `ens160`. Set it separately on each server.
+- `timezone` and `billing_day`: your provider's time zone and reset day. Each server has its own.
 - `monthly_limit_gb`: your provider's limit in GiB.
 - `count_mode`: `sum` if your provider bills in + out, `max` if it bills the larger of the two.
-- `bot_token` and `chat_id`: the values from the Bale setup in step 3.5.
-
-Each server has its own `timezone`, `billing_day`, `monthly_limit_gb`, and `count_mode`. Set them to match that server's provider.
+- `bot_token` and `chat_id`: the values from step 3.8.
+- `provider`: `bale` or `telegram`.
 
 ## Setup
 
@@ -250,7 +269,7 @@ openssl verify -CAfile ca.pem client.pem
 
 Expected: `client.pem: OK`.
 
-Copy `ca.pem` to the foreign server. Copy `client.pem` and `client.key` to the inside server. Use `scp` or your file manager. Never copy `ca.key` to either server.
+Copy `ca.pem` to the foreign server. Copy `client.pem`, `client.key`, and `targets.json` to the inside server. Use `scp` or your file manager. Never copy `ca.key` to either server.
 
 ### Step 1: Common steps (both servers)
 
@@ -294,16 +313,16 @@ Expected: `root portman` on `/etc/portman`, and `portman portman` on the other t
 
 ```bash
 sudo apt update
-sudo apt install -y acl curl python3 ufw
+sudo apt install -y acl curl python3 ufw iputils-ping
 ```
 
 Test:
 
 ```bash
-command -v setfacl curl python3 ufw
+command -v setfacl curl python3 ufw ping
 ```
 
-All four paths should print.
+All five paths should print. `iputils-ping` provides the `ping` command the checks use.
 
 #### 1.4 Install the binary
 
@@ -311,7 +330,7 @@ Download `portman-<version>-linux-amd64` from the release page, then:
 
 ```bash
 sudo install -m 0755 portman-<version>-linux-amd64 /usr/local/bin/portman
-/usr/local/bin/portman -version
+/usr/local/bin/portman -v
 ```
 
 Test: the output shows the version and commit you expect.
@@ -379,7 +398,7 @@ Expected: `subject=CN = portman-ca`.
 sudo nano /etc/portman/server.json
 ```
 
-Paste the `server.json` block from the Example configuration section, and change the `stats.interface` value. Then set the permissions:
+Paste the `server.json` block from the Example configuration section, and set `stats.interface`, `timezone`, and `billing_day` for this server. Then set the permissions:
 
 ```bash
 sudo chown root:portman /etc/portman/server.json
@@ -439,7 +458,7 @@ Delete any rule that allows 4443 or 8444 from anywhere, including IPv6 rules. Us
 sudo ufw delete NUMBER
 ```
 
-Test: `sudo ufw status | grep -E '4443|8444'` should list only the two `INSIDE_IP` rules. Also check the provider's firewall panel, which is separate from ufw. It must allow the same ports from the inside server's IP, or allow them with a rule that matches.
+Test: `sudo ufw status | grep -E '4443|8444'` should list only the two `INSIDE_IP` rules. Also check the provider's firewall panel, which is separate from ufw. It must allow the same ports from the inside server's IP.
 
 #### 2.8 Install and start the service
 
@@ -496,12 +515,11 @@ Test:
 
 ```bash
 sudo -u portman test -r /etc/portman/client.key && echo "key readable"
-openssl verify -CAfile /etc/portman/client.pem /etc/portman/client.pem 2>/dev/null | head -1
 ```
 
-The first line should print `key readable`. The client certificate is signed by the CA, but you don't have the CA on this server, so verify it on your own machine in step 0 instead of here.
+The first line should print `key readable`. The client certificate was signed by the CA on your own machine in step 0, so verify it there rather than on this server.
 
-#### 3.2 Install the client config
+#### 3.2 Install the client config and the targets file
 
 Find the interface name first:
 
@@ -515,23 +533,21 @@ Then open the config:
 sudo nano /etc/portman/client.json
 ```
 
-Paste the `client.json` block from the Example configuration section, and set `stats.interface`, `bot_token`, and `chat_id` (step 3.8 explains how to get the last two). Then set permissions:
+Paste the `client.json` block from the Example configuration section, and set `stats.interface`, `timezone`, `billing_day`, `bot_token`, and `chat_id`. Step 3.8 explains how to get the last two. Then set permissions:
 
 ```bash
 sudo chown root:portman /etc/portman/client.json
 sudo chmod 0640 /etc/portman/client.json
 ```
 
-Then move or open the targets file:
-
-```bash
-sudo nano /etc/portman/targets.json
-```
-OR
+Install the targets file from the copy you made in step 0 (or the one you prepared for checks):
 
 ```bash
 sudo install -o root -g portman -m 0640 /tmp/targets.json /etc/portman/targets.json
+sudo python3 -m json.tool /etc/portman/targets.json > /dev/null && echo "targets JSON OK"
 ```
+
+The targets file is needed on the inside server only.
 
 #### 3.3 Check the config
 
@@ -544,8 +560,9 @@ Expected: `JSON OK`, then `exit=124`. Anything else prints the error. Common cau
 
 - `client_ca_file is for server mode only`: remove that line from the client config.
 - `client_cert_file and client_key_file must be set together`: add the missing one.
-- `notify.chat_id is required` or `bot_token is required`: fill in the Bale values.
+- `notify.chat_id is required` or `bot_token is required`: fill in the bot values.
 - `json: cannot unmarshal number into Go struct field`: quote `chat_id`.
+- `decode config: invalid character '1' after object key:value pair`: a number has a leading zero, such as `01`. Write `1`.
 
 #### 3.4 Create the 3X-UI outbound and routing
 
@@ -595,11 +612,23 @@ For testing, use a separate inbound for the bridge, so a broken bridge doesn't c
 
 #### 3.5 Install and start the client service
 
+The client unit grants `CAP_NET_RAW` so `ping` works under `NoNewPrivileges`. Check that these two lines are under `[Service]` in `deploy/portman-client.service`:
+
+```ini
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+```
+
+Then install and start it:
+
 ```bash
 sudo install -m 0644 deploy/portman-client.service /etc/systemd/system/portman-client.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now portman-client
+systemctl show portman-client -p AmbientCapabilities
 ```
+
+The last command should print `AmbientCapabilities=cap_net_raw`.
 
 #### 3.6 Verify the bridge
 
@@ -615,6 +644,7 @@ Expected in the journal:
 - `startup check: remote bridge ... TCP connect OK`
 - `startup check: TLS handshake to bridge.example.com:4443 OK`
 - `next daily report at ...`
+- `next connectivity check at ...`
 
 Then test the reachability of the bridge port:
 
@@ -638,7 +668,7 @@ With the client certificate, the foreign server should return JSON:
 sudo curl -sS --max-time 10 --cert /etc/portman/client.pem --key /etc/portman/client.key https://bridge.example.com:8444/stats | python3 -m json.tool | head -30
 ```
 
-Expected: `"label": "foreign"` near the top, and a `snapshot` section.
+Expected: `"label": "foreign"` near the top, and a `snapshot` section. The response includes `cycle_start`, which shows the billing cycle date this server uses. Compare it with the `billing_day` you set.
 
 Without a certificate, it must refuse:
 
@@ -648,12 +678,12 @@ curl -sS --max-time 10 https://bridge.example.com:8444/stats
 
 Expected: a certificate-required error.
 
-#### 3.8 Set up the Bale bot and test the report
+#### 3.8 Set up the bot and test the report
 
-1. In Bale, create a bot with the bot creator, and save its token.
+1. Create a bot in Bale (or Telegram, and set `provider` to `telegram`), and save its token.
 2. Put the token in `bot_token` in `/etc/portman/client.json`.
 3. Send any message to the bot from the account that should receive reports.
-4. Read the token from the config without pasting it anywhere, and get the chat ID:
+4. Read the token from the config without pasting it anywhere, and get the chat ID. For Bale:
 
 ```bash
 TOKEN=$(sudo python3 -c 'import json;print(json.load(open("/etc/portman/client.json"))["notify"]["bot_token"])')
@@ -661,19 +691,29 @@ curl -sS "https://tapi.bale.ai/bot${TOKEN}/getMe"
 curl -sS "https://tapi.bale.ai/bot${TOKEN}/getUpdates"
 ```
 
+For Telegram, use `https://api.telegram.org` in place of `https://tapi.bale.ai`.
+
 `getMe` should return `"ok":true`. In `getUpdates`, find `"chat":{"id":...}` and put that number in `chat_id`, in quotes. Then restart the service:
 
 ```bash
 sudo systemctl restart portman-client
 ```
 
-Send a report now. Run it as the `portman` user, from a directory it can access:
+Send a traffic report now. Run it as the `portman` user, from a directory it can access:
 
 ```bash
 cd / && sudo -u portman /usr/local/bin/portman -config /etc/portman/client.json -report-now; echo "exit=$?"
 ```
 
-Expected: `exit=0` and a message in Bale with the `[inside]` section, plus a `[foreign]` section. If the foreign section says it's not reachable, return to the firewall checks in 2.7 and 3.7.
+Expected: `exit=0` and a message in the bot with the `[inside]` section, plus a `[foreign]` section. If the foreign section says it's not reachable, return to the firewall checks in 2.7 and 3.7.
+
+Send a connectivity check now:
+
+```bash
+cd / && sudo -u portman /usr/local/bin/portman -config /etc/portman/client.json -checks-now; echo "exit=$?"
+```
+
+Expected: `exit=0` and a bot message with one section per group.
 
 Check that the token never reached the log file. This should print `0`:
 
@@ -693,11 +733,27 @@ sudo tail -f /var/log/portman/client.log
 
 Change a config: edit it, run the JSON check and the timeout test from step 2.5 or 3.3, then restart.
 
-Send a report now, always as `portman`:
+Send a traffic report or a connectivity check now, always as `portman`:
 
 ```bash
 cd / && sudo -u portman /usr/local/bin/portman -config /etc/portman/client.json -report-now
+cd / && sudo -u portman /usr/local/bin/portman -config /etc/portman/client.json -checks-now
 ```
+
+Change the target list: edit `/etc/portman/targets.json` and keep the file's mode `0640` with group `portman`. The service reads the file on every check, so no restart is needed. Check the JSON after each edit:
+
+```bash
+sudo python3 -m json.tool /etc/portman/targets.json > /dev/null && echo "targets JSON OK"
+```
+
+Retire the old cron script: once the first scheduled connectivity report arrives on its real day, remove only the `check_net.sh` line from the crontab. Check first:
+
+```bash
+crontab -l
+sudo crontab -l
+```
+
+Keep the script file until one full cycle has passed without problems.
 
 Update to a new release:
 
@@ -705,7 +761,7 @@ Update to a new release:
 sudo cp /usr/local/bin/portman /usr/local/bin/portman.prev
 sudo install -m 0755 portman-<new-version>-linux-amd64 /usr/local/bin/portman
 sudo systemctl restart portman-client    # or portman-server
-/usr/local/bin/portman -version
+/usr/local/bin/portman -v
 ```
 
 Roll back:
@@ -715,7 +771,7 @@ sudo install -m 0755 /usr/local/bin/portman.prev /usr/local/bin/portman
 sudo systemctl restart portman-client    # or portman-server
 ```
 
-Turn the report off: set `notify.enabled` to `false` in `client.json`, then restart. The bridge keeps running.
+Turn the traffic report off: set `notify.enabled` to `false` in `client.json`, then restart. The bridge keeps running. Turn the connectivity checks off: set `checks.enabled` to `false`.
 
 Reset the counters: stop the service, move the state file aside, and start again. This erases the history.
 
@@ -741,7 +797,7 @@ sudo chmod 0640 /etc/portman/client.key
 sudo chmod 0644 /etc/portman/client.pem
 ```
 
-On the server, replace `client.json` and `client.key` with `server.json` and the server key, and omit `targets.json` and `client.pem`.
+On the foreign server, use `server.json` and the server key in place of `client.json` and `client.key`, and omit `targets.json` and `client.pem`.
 
 Check that the service user can read each file:
 
@@ -759,30 +815,24 @@ systemctl is-active portman-client
 |---|---|---|
 | Service shows `activating (auto-restart)` | `sudo journalctl -u portman-client -n 50` | Run the binary manually as `portman` (step 3.3). It prints the exact error. |
 | `invalid config: ...` | The message names the field | Fix that field. Mode-specific settings are the usual cause. |
+| `decode config: invalid character '1' after object key:value pair` | A number with a leading zero, such as `"billing_day": 01` | Write `1`. JSON doesn't allow leading zeros. |
+| `flag provided but not defined: -v` | Binary older than 0.7.1 | Install 0.7.1 or later, then use `-v` or `-version`. |
 | `Failed to open log file: permission denied` | `ls -l /var/log/portman` | `sudo chown -R portman:portman /var/log/portman`. A root-run command created the file. |
 | Server log: `certificate required` | Client config | Add `client_cert_file` and `client_key_file`, and check that the client certificate is signed by `ca.pem`. |
 | Client log: `unknown authority` or `bad certificate` | Server config and `ca.pem` | `client_ca_file` must be the CA that signed `client.pem`. |
 | Client log: `certificate is valid for ..., not ...` | `server_name` | Set `server_name` and the hostname to the certificate name. |
 | Stats: `context deadline exceeded` | Step 3.7 | Firewall: allow 8444 from `INSIDE_IP`, and check the provider's firewall panel. |
-| Stats: `connection refused` | `ss -tlnp \| grep 8444` on foreign | The service isn't listening. Check its journal, and check `portman -version` for the stats-capable version. |
+| Stats: `connection refused` | `ss -tlnp \| grep 8444` on foreign | The service isn't listening. Check its journal. The stats endpoint needs 0.5.0 or later. |
 | Report has only `[inside]` | Journal: `foreign stats unavailable` | Same as the stats row above. |
 | Report shows zero counts | `sudo cat /var/lib/portman/state.json`; journal for `stats save failed` | Check ownership of `/var/lib/portman`. A one-shot run has no baseline, so the scheduled service provides the numbers. |
-| Bale `HTTP 401` | Token | Copy the token again from the bot creator. |
-| Bale `chat not found` | `chat_id` | Message the bot, then read `getUpdates` again. |
+| Bot `HTTP 401` | Token | Copy the token again from the bot creator. |
+| Bot `chat not found` | `chat_id` | Message the bot, then read `getUpdates` again. |
 | Bridge connects, but nothing passes | Foreign log shows `0 bytes` | The inside outbound's ID doesn't match the foreign inbound client. |
 | Pages are slow | Client log `dial took` | Each new connection pays a handshake. See the roadmap for connection reuse. |
 | `read targets file: permission denied` | `ls -l /etc/portman` and `ls -ld /etc/portman` | Apply the File permissions section. The directory needs `root:portman` with mode `0750`. |
+| Checks show `ping no reply` with `-checks-now` working in a terminal | `systemctl show portman-client -p AmbientCapabilities` | Add `AmbientCapabilities=CAP_NET_RAW` and `CapabilityBoundingSet=CAP_NET_RAW` to the client unit, then `daemon-reload` and restart. |
+| Checks show `PARTIAL` with ping OK and `DNS no answer` | The address's resolver | The resolver refuses queries from outside its network. This is expected for some ISP resolvers. Treat it as "host up, DNS closed to us." |
 | Config readable by other users | `ls -l /etc/portman/client.json` | Set mode `0640` (see File permissions). The config holds the bot token. |
-
-### Reading the report
-
-Each address shows one status:
-
-- `OK`: ping and DNS both answered.
-- `PARTIAL`: one of the two answered. Often the host is up, but its resolver refuses queries from outside its network.
-- `DOWN`: neither answered.
-
-The last line counts successes across all addresses: `ping ok: 20/21` means 20 of 21 addresses answered a ping, and `DNS ok: 16/21` means 16 answered the DNS query.
 
 ### Security
 
@@ -806,9 +856,11 @@ Report security problems privately to the maintainer, not in a public issue.
 - Portman has no protocol awareness. The protocol and identity must match on both sides.
 - One listener per process. A server handles one bridge port.
 - Counters are sampled every `sample_interval`. If the service stops abruptly, up to one interval of counts can be lost.
-- The report is sent only if the inside server is running at `send_at`. Missed reports are not sent later.
+- The traffic report is sent only if the inside server is running at `send_at`. Missed reports are not sent later.
 - Interface counters use `/proc/net/dev`, so they work on Linux only.
 - Each new local connection pays a new TLS handshake, which adds latency on long links.
+- DNS results depend on the resolver. Some ISP resolvers refuse outside queries, so their addresses show `PARTIAL` even when the host is up.
+- The connectivity checks use the system `ping` command. It must be installed, and the client unit must grant `CAP_NET_RAW`.
 
 ## License
 
